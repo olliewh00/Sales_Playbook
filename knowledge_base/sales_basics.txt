@@ -1,0 +1,26 @@
+Sales Playbook Notes
+
+1. Lead Stage
+- Goal: qualify inbound and outbound leads quickly.
+- Core KPIs: response time, lead-to-discovery conversion.
+- Action: run a short qualification script (budget, authority, need, timeline).
+
+2. Discovery Stage
+- Goal: uncover measurable business pain and desired outcomes.
+- Core KPIs: discovery-to-proposal conversion, meeting quality score.
+- Action: ask at least 5 problem-depth questions and summarize pain in customer language.
+
+3. Proposal Stage
+- Goal: map product capabilities to quantified business value.
+- Core KPIs: proposal acceptance rate, average time in stage.
+- Action: include ROI estimate, implementation plan, and risk mitigation.
+
+4. Closing Stage
+- Goal: remove final blockers and confirm decision process.
+- Core KPIs: win rate, cycle length.
+- Action: identify legal/procurement constraints early and define clear next-step commitments.
+
+Objection Handling
+- Price objection: re-anchor to ROI and total cost of delay.
+- Timing objection: co-create phased rollout with low-risk pilot scope.
+- Competitor objection: compare outcomes, not features.

@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="RealtyAI - Sales Manager RAG Playbook and Pipeline Assistant" />
+  <title>Sales Manager AI Playbook</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  
+  <!-- Onboarding Splash Screen Overlay -->
+  <div id="onboarding-overlay" class="onboarding-overlay hidden">
+    <div class="onboarding-card">
+      <div class="onboarding-logo">⚡</div>
+      <h2>Welcome to RealtyAI</h2>
+      <p>Configure your workspace to personalize your sales management playbook and AI coach experience.</p>
+      <form id="onboarding-form" class="onboarding-form">
+        <div class="form-group">
+          <label for="user-name">Manager Name</label>
+          <input type="text" id="user-name" class="form-input" placeholder="Enter your name" required />
+        </div>
+        <div class="form-group">
+          <label for="workspace-env">Real Estate Focus</label>
+          <select id="workspace-env" class="form-select">
+            <option value="Residential Brokerage">Residential Brokerage</option>
+            <option value="Commercial Real Estate (CRE)">Commercial Real Estate (CRE)</option>
+            <option value="Property Developer">Property Developer</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="user-exp">AI Maturity Level / Experience</label>
+          <select id="user-exp" class="form-select">
+            <option value="Junior User">Junior User (Occasional AI tool use)</option>
+            <option value="Mid Operator">Mid Operator (Use structured prompting & routines)</option>
+            <option value="Senior Builder">Senior Builder (Build custom GPTs, SOPs & workflows)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="target-savings">Weekly Time Saving Target (Hours)</label>
+          <input type="number" id="target-savings" class="form-input" value="16" min="5" max="30" required />
+        </div>
+        <button type="submit" class="onboarding-btn">Launch Workspace</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main App Shell Layout -->
+  <div class="app-container">
+    
+    <!-- Sticky Navigation Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">⚡</div>
+        <div class="brand-text">
+          <h1>RealtyAI</h1>
+          <span class="brand-badge" id="brand-badge-text">Playbook Engine</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-tab="dashboard">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Dashboard</span>
+        </button>
+        <button class="nav-item" data-tab="pipeline">
+          <span class="nav-icon">📋</span>
+          <span class="nav-label">Pipeline Board</span>
+        </button>
+        <button class="nav-item" data-tab="assistant">
+          <span class="nav-icon">💬</span>
+          <span class="nav-label">AI Coach Assistant</span>
+        </button>
+        <button class="nav-item" data-tab="knowledge">
+          <span class="nav-icon">📚</span>
+          <span class="nav-label">SOP Knowledge Base</span>
+        </button>
+        <button class="nav-item" data-tab="tools">
+          <span class="nav-icon">🛠</span>
+          <span class="nav-label">Strategy Tools</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar Progress / Interactive Recovery Summary -->
+      <div class="sidebar-progress-card">
+        <div class="progress-info">
+          <span class="progress-title">Weekly Time Reclaimed</span>
+          <span class="progress-percentage" id="sidebar-reclaimed-hours">0h / 16h</span>
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" id="sidebar-progress-bar" style="width: 0%"></div>
+        </div>
+        <p class="progress-tip">Deploy target AI solutions to recover weekly hours.</p>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="user-profile">
+          <div class="avatar" id="user-avatar">SM</div>
+          <div class="user-info">
+            <span class="user-name" id="profile-name">Sales Manager</span>
+            <span class="user-role" id="profile-role">Workspace Owner</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      
+      <!-- Top Header -->
+      <header class="app-header">
+        <div class="header-title">
+          <h2 id="page-title">Dashboard Overview</h2>
+          <p id="page-subtitle" class="header-description">Track your current condition, time waste metrics, and active AI guardrails.</p>
+        </div>
+        <div class="header-actions">
+          <button class="reset-profile-btn" id="btn-reset-profile">Reset Profile</button>
+          <div class="live-indicator">
+            <span class="indicator-dot animate-pulse"></span>
+            <span class="indicator-text">Active Playbook</span>
+          </div>
+          <div class="system-time" id="header-date">June 22, 2026</div>
+        </div>
+      </header>
+
+      <!-- Content Views (Tabs) Container -->
+      <div class="content-container">
+        
+        <!-- TAB 1: DASHBOARD -->
+        <section id="tab-dashboard" class="tab-pane active">
+          <!-- Top Row Metrics -->
+          <div class="metrics-grid">
+            <div class="metric-card warning-card">
+              <div class="card-icon-wrapper">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div class="metric-data">
+                <span class="metric-label">Estimated Weekly Time Waste</span>
+                <div class="metric-value-group">
+                  <h3 class="metric-value text-red" id="metric-waste-hours">12-18 Hours</h3>
+                  <span class="metric-sub text-red" id="metric-waste-sub">Leaking Current Week</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="metric-card navy-card">
+              <div class="card-icon-wrapper">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <div class="metric-data">
+                <span class="metric-label">Operational Focus Goal</span>
+                <div class="metric-value-group">
+                  <h3 class="metric-value" id="dashboard-focus-goal">Maximize GCI</h3>
+                  <span class="metric-sub" id="dashboard-focus-sub">Reduce Days on Market</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="metric-card emerald-card">
+              <div class="card-icon-wrapper">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div class="metric-data">
+                <span class="metric-label">AI Target State Goal</span>
+                <div class="metric-value-group">
+                  <h3 class="metric-value text-emerald" id="dashboard-target-savings">Reclaim 40%</h3>
+                  <span class="metric-sub" id="dashboard-target-sub">~16 Hours of Work Week</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Time Leak Breakdown Section -->
+          <div class="dashboard-section-grid">
+            
+            <div class="dashboard-block-card">
+              <div class="card-header">
+                <div>
+                  <h4>Operational Time Leak Breakdown</h4>
+                  <p class="card-subtitle">Select which AI experiments to deploy to simulate your recovered hours.</p>
+                </div>
+                <button class="btn btn-secondary btn-xs" id="btn-deploy-all">Deploy All</button>
+              </div>
+              <div class="table-container">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 45%;">Operational Drag Activity</th>
+                      <th style="width: 20%; text-align: center;">Weekly Leak</th>
+                      <th style="width: 20%;">Target AI Solution</th>
+                      <th style="width: 15%; text-align: center;">Reclaim</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr class="interactive-row" data-leak="meetings">
+                      <td>
+                        <div class="drag-name">
+                          <strong>Inefficient Meetings</strong>
+                          <span>Syncs, status reports, alignments</span>
+                        </div>
+                      </td>
+                      <td class="text-center font-semibold text-red">4 - 6 Hours</td>
+                      <td><span class="pill pill-blue">MS Teams Recap</span></td>
+                      <td class="text-center">
+                        <label class="switch">
+                          <input type="checkbox" class="leak-toggle" data-hours="5.0" id="toggle-meetings" />
+                          <span class="slider round"></span>
+                        </label>
+                      </td>
+                    </tr>
+                    <tr class="interactive-row" data-leak="emails">
+                      <td>
+                        <div class="drag-name">
+                          <strong>Repetitive Emails & Follow-ups</strong>
+                          <span>Client viewing touchpoints, cold leads</span>
+                        </div>
+                      </td>
+                      <td class="text-center font-semibold text-red">3 - 5 Hours</td>
+                      <td><span class="pill pill-blue">ACP Prompt Engine</span></td>
+                      <td class="text-center">
+                        <label class="switch">
+                          <input type="checkbox" class="leak-toggle" data-hours="4.0" id="toggle-emails" />
+                          <span class="slider round"></span>
+                        </label>
+                      </td>
+                    </tr>
+                    <tr class="interactive-row" data-leak="data-entry">
+                      <td>
+                        <div class="drag-name">
+                          <strong>Manual Data Entry</strong>
+                          <span>CRM logging, Excel reporting</span>
+                        </div>
+                      </td>
+                      <td class="text-center font-semibold text-red">3 - 4 Hours</td>
+                      <td><span class="pill pill-blue">Copilot in Excel</span></td>
+                      <td class="text-center">
+                        <label class="switch">
+                          <input type="checkbox" class="leak-toggle" data-hours="3.5" id="toggle-data" />
+                          <span class="slider round"></span>
+                        </label>
+                      </td>
+                    </tr>
+                    <tr class="interactive-row" data-leak="searching">
+                      <td>
+                        <div class="drag-name">
+                          <strong>Searching for SOPs & Data</strong>
+                          <span>Answering agent questions, policies</span>
+                        </div>
+                      </td>
+                      <td class="text-center font-semibold text-red">2 - 3 Hours</td>
+                      <td><span class="pill pill-blue">NotebookLM SOP Chat</span></td>
+                      <td class="text-center">
+                        <label class="switch">
+                          <input type="checkbox" class="leak-toggle" data-hours="2.5" id="toggle-searching" />
+                          <span class="slider round"></span>
+                        </label>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- AI Usage Guardrails Component -->
+            <div class="dashboard-block-card">
+              <div class="card-header">
+                <div>
+                  <h4>AI Governance & Usage Guardrails</h4>
+                  <p class="card-subtitle">Green Light / Red Light policy check. Toggle modes below.</p>
+                </div>
+                <div class="toggle-button-group">
+                  <button class="toggle-btn active" id="guardrail-mode-policy">Policy Viewer</button>
+                  <button class="toggle-btn" id="guardrail-mode-tester">Scenario Tester</button>
+                </div>
+              </div>
+
+              <!-- View 1: Static Policy View -->
+              <div class="guardrail-view" id="policy-view">
+                <div class="guardrail-panel-split">
+                  <div class="guardrail-panel green-panel">
+                    <div class="panel-header">
+                      <span class="bullet-dot green"></span>
+                      <h5>🟢 GREEN LIGHT (AI Approved)</h5>
+                    </div>
+                    <ul class="panel-list">
+                      <li>
+                        <strong>Drafting Property Viewings Follow-ups</strong>
+                        <span>Quick personalized follow-up email drafts for buyers.</span>
+                      </li>
+                      <li>
+                        <strong>Meeting Transcript Summarization</strong>
+                        <span>Extract action points and agendas from transcriptions.</span>
+                      </li>
+                      <li>
+                        <strong>CRM Metric Extraction</strong>
+                        <span>Parse raw communications to capture numeric performance statistics.</span>
+                      </li>
+                      <li>
+                        <strong>Listing Descriptions</strong>
+                        <span>Synthesize listing features into attractive real estate copy.</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div class="guardrail-panel red-panel">
+                    <div class="panel-header">
+                      <span class="bullet-dot red"></span>
+                      <h5>🔴 RED LIGHT (Human-Only)</h5>
+                    </div>
+                    <ul class="panel-list">
+                      <li>
+                        <strong>Closing High-Value Negotiations</strong>
+                        <span>Final contract rate, concession, and terms alignment.</span>
+                      </li>
+                      <li>
+                        <strong>Sensitive Personnel Management</strong>
+                        <span>Terminating, hiring, or promoting agents. Disciplinary chats.</span>
+                      </li>
+                      <li>
+                        <strong>Final Legal Contracts</strong>
+                        <span>Approving contract wording, binding compliance reviews.</span>
+                      </li>
+                      <li>
+                        <strong>Client Dispute Mediation</strong>
+                        <span>De-escalating active formal legal complaints or commission splits.</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <!-- View 2: Interactive Scenario Tester -->
+              <div class="guardrail-view d-none" id="tester-view">
+                <div class="scenario-tester-box">
+                  <p class="tester-intro">Enter a real estate task or click one of the quick scenario buttons to evaluate AI suitability instantly:</p>
+                  
+                  <div class="tester-quick-chips">
+                    <button class="scenario-chip" data-text="I want to draft a listing description based on home features.">Listing Description</button>
+                    <button class="scenario-chip" data-text="I need to terminate an agent for poor sales performance.">Terminate Agent</button>
+                    <button class="scenario-chip" data-text="Extract monthly deal counts from agent meeting transcripts.">Extract CRM data</button>
+                    <button class="scenario-chip" data-text="Review commission dispute between two top-performing agents.">Resolve Commission Dispute</button>
+                  </div>
+
+                  <div class="tester-input-group">
+                    <input type="text" id="scenario-input" placeholder="Type a scenario (e.g. Draft email to buyer...)" class="form-input" />
+                    <button class="btn btn-primary" id="btn-evaluate">Evaluate Task</button>
+                  </div>
+
+                  <div class="tester-result-container d-none" id="tester-result">
+                    <!-- Dynamic Result Card -->
+                    <div class="result-status-card" id="tester-result-card">
+                      <div class="result-badge" id="tester-result-badge">GREEN LIGHT</div>
+                      <div class="result-body">
+                        <h5 id="tester-result-title">AI Approved Task</h5>
+                        <p id="tester-result-desc">Reasoning details go here...</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </section>
+
+        <!-- TAB 2: PIPELINE BOARD -->
+        <section id="tab-pipeline" class="tab-pane">
+          <div class="pipeline-layout">
+            <div class="panel-header" style="padding: 0 0 1rem 0;">
+              <div class="pipeline-header-row">
+                <div>
+                  <h2>Deal & Listing Pipeline</h2>
+                  <p>Track clients and listings across stages. Drag cards to update progress.</p>
+                </div>
+                <button type="button" id="openDealWizardBtn" class="btn btn-primary">Add Deal Tile</button>
+              </div>
+            </div>
+
+            <!-- Deal Wizard Modal -->
+            <div id="dealWizard" class="deal-wizard-modal hidden" aria-hidden="true">
+              <div class="deal-wizard-card">
+                <p class="wizard-step" id="wizardStep">Question 1 of 5</p>
+                <label id="wizardQuestion" class="wizard-question" for="wizardInput"></label>
+                <div id="wizardFieldContainer" class="wizard-field-container">
+                  <input id="wizardInput" class="wizard-input" type="text" autocomplete="off" />
+                </div>
+                <div class="wizard-actions">
+                  <button type="button" id="wizardCancelBtn" class="btn btn-secondary">Cancel</button>
+                  <div class="wizard-left-btns">
+                    <button type="button" id="wizardBackBtn" class="btn btn-secondary">Back</button>
+                    <button type="button" id="wizardNextBtn" class="btn btn-primary">Next</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Kanban Board Grid -->
+            <div class="kanban-board" id="kanbanBoard">
+              <article class="kanban-column">
+                <header>
+                  <h3>Lead</h3>
+                  <span class="count" data-count>0</span>
+                </header>
+                <div class="kanban-cards">
+                  <div class="deal-card">
+                    <h4>Northwind Retail</h4>
+                    <p>Buyer toured 120 Oak St. Follow-up email scheduled. Lead source: Zillow Inbound.</p>
+                    <div class="deal-card-meta">
+                      <span class="deal-value">$18k GCI</span>
+                      <span class="deal-next-action">MLS Email follow-up</span>
+                    </div>
+                  </div>
+                  <div class="deal-card">
+                    <h4>Blue Harbor Logistics</h4>
+                    <p>Requested details on CRE industrial lot. Outbound reply sent.</p>
+                    <div class="deal-card-meta">
+                      <span class="deal-value">$24k GCI</span>
+                      <span class="deal-next-action">Call client Monday</span>
+                    </div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="kanban-column">
+                <header>
+                  <h3>Discovery</h3>
+                  <span class="count" data-count>0</span>
+                </header>
+                <div class="kanban-cards">
+                  <div class="deal-card">
+                    <h4>Atlas Components</h4>
+                    <p>Toured 440 River Road. Budget verified. Pre-approval letters uploaded.</p>
+                    <div class="deal-card-meta">
+                      <span class="deal-value">$42k GCI</span>
+                      <span class="deal-next-action">Send disclosure package</span>
+                    </div>
+                  </div>
+                  <div class="deal-card">
+                    <h4>Pioneer Med</h4>
+                    <p>Consultation call complete. Specific 3-bath property requirements noted.</p>
+                    <div class="deal-card-meta">
+                      <span class="deal-value">$31k GCI</span>
+                      <span class="deal-next-action">Schedule weekend tours</span>
+                    </div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="kanban-column">
+                <header>
+                  <h3>Proposal</h3>
+                  <span class="count" data-count>0</span>
+                </header>
+                <div class="kanban-cards">
+                  <div class="deal-card">
+                    <h4>Summit Hospitality</h4>
+                    <p>Broker opinion of value generated. Listing agreement proposal sent.</p>
+                    <div class="deal-card-meta">
+                      <span class="deal-value">$55k GCI</span>
+                      <span class="deal-next-action">Negotiate commission split</span>
+                    </div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="kanban-column">
+                <header>
+                  <h3>Closed Won</h3>
+                  <span class="count" data-count>0</span>
+                </header>
+                <div class="kanban-cards">
+                  <div class="deal-card">
+                    <h4>Greenline Foods</h4>
+                    <p>Represented buyer. Escrow closed, funds wired, keys delivered.</p>
+                    <div class="deal-card-meta">
+                      <span class="deal-value">$64k GCI</span>
+                      <span class="deal-next-action">Archive client file</span>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- TAB 3: AI COACH ASSISTANT -->
+        <section id="tab-assistant" class="tab-pane">
+          <div class="assistant-layout">
+            
+            <!-- Left Side Chat Pane -->
+            <div class="chat-panel">
+              <div class="panel-header">
+                <div>
+                  <h3>AI Playbook Assistant</h3>
+                  <p class="card-subtitle">Personalized sales manager RAG coach. Dynamic strategies grounded in your SOP files.</p>
+                </div>
+                <span class="dot-status" id="chat-status">Ready</span>
+              </div>
+              <div class="chat-messages" id="chatMessages">
+                <div class="message ai-message">
+                  <p>Hello! Ask a question and I will search your sales playbook for tactical guidance.</p>
+                </div>
+              </div>
+              <form id="chatForm" class="chat-input-row">
+                <input id="chatInput" type="text" placeholder="Ask your sales playbook question..." autocomplete="off" required />
+                <button type="submit" id="sendBtn" class="btn btn-primary">Send</button>
+              </form>
+            </div>
+
+            <!-- Right Side Upload & Files Pane -->
+            <div class="side-panel">
+              <div class="upload-panel">
+                <div class="upload-header">
+                  <h3>Add RAG Files</h3>
+                  <p>Upload .txt, .md, or .pdf files to index real brokerage rules and guidelines.</p>
+                </div>
+                <form id="uploadForm" class="upload-form">
+                  <input id="ragFiles" type="file" accept=".txt,.md,.pdf" multiple required />
+                  <button type="submit" id="uploadBtn" class="btn btn-primary">Upload to RAG</button>
+                </form>
+                <p id="uploadStatus" class="upload-status" aria-live="polite"></p>
+                
+                <div class="kb-files-panel">
+                  <div class="kb-files-header">
+                    <h4>Indexed RAG Files</h4>
+                    <button type="button" id="refreshFilesBtn" class="refresh-files-btn">Refresh</button>
+                  </div>
+                  <ul id="kbFilesList" class="kb-files-list" aria-live="polite">
+                    <li class="kb-file-item kb-file-empty">No files added yet.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- TAB 4: SOP KNOWLEDGE BASE -->
+        <section id="tab-knowledge" class="tab-pane">
+          <div class="sop-layout">
+            
+            <!-- Left: List of SOPs -->
+            <div class="sop-sidebar">
+              <div class="sop-search-container">
+                <input type="text" id="sop-sidebar-search" placeholder="Filter SOP documents..." />
+              </div>
+              <ul class="sop-list" id="sop-documents-list">
+                <li class="sop-list-item active" data-sop="lead-routing">
+                  <span class="doc-icon">📄</span>
+                  <div class="doc-info">
+                    <span class="doc-title">SOP: Lead Handling & Routing</span>
+                    <span class="doc-meta">Updated 3 days ago • Rev 4.1</span>
+                  </div>
+                </li>
+                <li class="sop-list-item" data-sop="listing-launch">
+                  <span class="doc-icon">📄</span>
+                  <div class="doc-info">
+                    <span class="doc-title">SOP: Listing Launch Checklist</span>
+                    <span class="doc-meta">Updated 1 week ago • Rev 2.0</span>
+                  </div>
+                </li>
+                <li class="sop-list-item" data-sop="dispute-res">
+                  <span class="doc-icon">📄</span>
+                  <div class="doc-info">
+                    <span class="doc-title">SOP: Commission Dispute Resolution</span>
+                    <span class="doc-meta">Updated 2 weeks ago • Rev 1.2</span>
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            <!-- Middle: Active Document Viewer -->
+            <div class="sop-viewer">
+              <div class="viewer-header">
+                <h4 id="sop-title">SOP: Lead Handling & Routing</h4>
+                <span class="viewer-meta" id="sop-revision">Revision 4.1</span>
+              </div>
+              <div class="viewer-body" id="sop-content-body">
+                <!-- Javascript will inject SOP contents here -->
+              </div>
+            </div>
+
+            <!-- Right: NotebookLM Sim -->
+            <div class="notebook-panel">
+              <div class="notebook-header">
+                <div class="notebook-logo">
+                  <span class="nb-icon">⚡</span>
+                  <strong>NotebookLM Simulator</strong>
+                </div>
+                <span class="nb-badge">Grounded in SOPs</span>
+              </div>
+              <div class="notebook-chat-area" id="nb-chat-area">
+                <div class="chat-message bot-message">
+                  <p>Hello! I am NotebookLM, grounded in your loaded team SOPs. Ask me a question to simulate query answers or click one of the suggestions below.</p>
+                </div>
+              </div>
+              <div class="notebook-suggestions">
+                <span class="suggestion-label">Suggested Agent Queries:</span>
+                <button class="nb-suggest-btn" data-query="What is the response time limit for a hot web lead?">What is the lead response limit?</button>
+                <button class="nb-suggest-btn" data-query="What are the marketing steps for the first 24 hours of a listing?">First 24 hours marketing steps?</button>
+                <button class="nb-suggest-btn" data-query="How is a dispute resolved if two agents claim the same lead?">How to resolve lead disputes?</button>
+              </div>
+              <div class="notebook-input-wrapper">
+                <input type="text" id="notebook-query-input" placeholder="Query internal SOPs to answer repetitive agent questions..." />
+                <button class="btn btn-primary btn-xs" id="btn-submit-notebook-query" style="padding: 0.5rem 1rem;">Ask</button>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- TAB 5: STRATEGY & REPORTING TOOLS -->
+        <section id="tab-tools" class="tab-pane">
+          <div class="split-layout">
+            
+            <!-- Left: Prompting Engine -->
+            <div class="split-pane">
+              <div class="tab-header-box">
+                <h3 class="pane-title">Action, Context, Parameters (ACP) Prompting Engine</h3>
+                <p class="card-subtitle">Draft robust, high-performance prompts that produce clear, human-like real estate emails. Zero generic AI filler language.</p>
+              </div>
+
+              <div class="form-group">
+                <label for="comm-scenario">Select Scenario Template</label>
+                <select id="comm-scenario" class="form-select">
+                  <option value="silent-client">Silent Client Follow-up (After Property Viewing)</option>
+                  <option value="listing-desc">Property Listing Description Generation</option>
+                  <option value="comm-inquiry">Standard Response to Commission Split Inquiries</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="comm-context">Context / Property Details</label>
+                <textarea id="comm-context" class="form-textarea" rows="4" placeholder="Specify home specifics and client interaction context."></textarea>
+              </div>
+
+              <div class="form-group">
+                <label for="comm-parameters">Parameters (Tone, Length, Constraints)</label>
+                <textarea id="comm-parameters" class="form-textarea" rows="3" placeholder="Specify constraints like tone, word count limits, forbidden words."></textarea>
+              </div>
+
+              <button class="btn btn-primary btn-full" id="btn-generate-prompt">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="btn-icon">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                Generate Playbook Prompt
+              </button>
+
+              <div class="output-header" style="margin-top: 1rem;">
+                <h4 class="pane-title">Generated ACP Prompt Template</h4>
+                <button class="btn btn-secondary btn-xs" id="btn-copy-prompt">Copy Prompt</button>
+              </div>
+
+              <div class="prompt-output-box">
+                <pre class="prompt-text-container" id="prompt-output-text">Select a scenario and click "Generate Playbook Prompt" to see the output.</pre>
+              </div>
+            </div>
+
+            <!-- Right: Summarizer & KPIs -->
+            <div class="split-pane">
+              <div class="tab-header-box">
+                <h3 class="pane-title">5W1H Reporting Engine (Who, What, Where, When, Why, How)</h3>
+                <p class="card-subtitle">Structure chaotic property reports and meetings into high-density actionable digests.</p>
+              </div>
+
+              <div class="form-group">
+                <label for="reporting-source-select">Select Raw Source</label>
+                <select id="reporting-source-select" class="form-select">
+                  <option value="transcript">Meeting Transcript (Weekly Agent Pipeline Review)</option>
+                  <option value="crm-data">CRM Data Export (Active Escrow & Leads Activity)</option>
+                </select>
+              </div>
+
+              <div class="raw-data-preview-box">
+                <label class="section-label">Raw Input Preview</label>
+                <div class="raw-text" id="reporting-raw-content">Loading source transcript...</div>
+              </div>
+
+              <div class="generate-actions-bar">
+                <button class="btn btn-primary" id="btn-generate-summary">Generate 5W1H Summary</button>
+              </div>
+
+              <div class="summary-result-box d-none" id="summary-result-container">
+                <div class="summary-result-header">
+                  <span class="result-title">5W1H Structured Digest</span>
+                  <button class="btn btn-secondary btn-xs" id="btn-copy-summary">Copy Summary</button>
+                </div>
+                <div class="summary-scrollable" id="summary-result-text">
+                  <!-- JS inserts 5W1H content here -->
+                </div>
+              </div>
+
+              <!-- KPIs to Monitor -->
+              <div class="kpi-panel" style="margin-top: 1rem; border-top: 1px solid var(--border-light); padding-top: 1rem;">
+                <h4 class="pane-title">AI Performance KPIs to Monitor</h4>
+                
+                <div class="kpi-score-badge">
+                  <span class="kpi-score-val" id="kpi-percentage">0%</span>
+                  <span class="kpi-score-label">KPI Target Accomplishment</span>
+                </div>
+
+                <ul class="kpi-list">
+                  <li class="kpi-item">
+                    <label class="kpi-checkbox-label">
+                      <input type="checkbox" class="kpi-checkbox" id="kpi-drafts" />
+                      <div class="kpi-desc">
+                        <strong>Reduce Draft Interactions (&lt; 2 Revisions)</strong>
+                        <span>The AI summary is ready for client distribution immediately with minimal editing.</span>
+                      </div>
+                    </label>
+                  </li>
+                  <li class="kpi-item">
+                    <label class="kpi-checkbox-label">
+                      <input type="checkbox" class="kpi-checkbox" id="kpi-ifa" />
+                      <div class="kpi-desc">
+                        <strong>Improved First Answer (IFA) Rate &gt; 85%</strong>
+                        <span>The AI answers agent questions accurately in the first response without Hallucinations.</span>
+                      </div>
+                    </label>
+                  </li>
+                  <li class="kpi-item">
+                    <label class="kpi-checkbox-label">
+                      <input type="checkbox" class="kpi-checkbox" id="kpi-efficiency" />
+                      <div class="kpi-desc">
+                        <strong>Preparation Efficiency (Save &gt; 20 Mins)</strong>
+                        <span>Weekly reports are completed in under 5 minutes of input preparation time.</span>
+                      </div>
+                    </label>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+      </div>
+    </main>
+    
+  </div>
+
+  <!-- Toast Notification System -->
+  <div id="toast" class="toast d-none">Clipboard updated!</div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
