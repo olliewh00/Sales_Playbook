@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List
 
 # Import LangChain components
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain.tools.retriever import create_retriever_tool
 from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader, TextLoader
 from langchain_community.embeddings import FakeEmbeddings
