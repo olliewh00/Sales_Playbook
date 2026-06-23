@@ -441,13 +441,15 @@ class StreamlitDecisionAgent:
             "Search the sales strategy knowledge base for tactical guidance.",
         )
 
-    def _llm_decision(self, query: str, context: str, role: str, experience: str) -> str:
+    def _llm_decision(self, query: str, context: str, role: str, experience: str, pipeline_context: str = "") -> str:
         prompt = f"""You are a senior real estate sales enablement coach.
 The user is a {role} with {experience} experience.
-Use only the context below to give a concise, actionable answer. Tailor your tone to their experience level.
+Use the grounding knowledge base context and current pipeline details below to give a concise, actionable answer. Tailor your tone to their experience level.
 Do NOT wrap your answer in JSON or any code block — just reply directly in plain text.
 
-Context:
+{pipeline_context}
+
+Knowledge Base Document Context:
 {context}
 
 Question:
@@ -461,30 +463,43 @@ Question:
                 return "🚫 **API Quota Exceeded** — Your free tier daily limit is used up.\n\n**Fix options:**\n1. Wait ~24 hrs for quota to reset\n2. Enable billing at [aistudio.google.com](https://aistudio.google.com)"
             return f"⚠️ Model error: {str(e)[:200]}"
 
-    def ask(self, query: str, role: str, experience: str) -> dict:
+    def ask(self, query: str, role: str, experience: str, deals: list = None) -> dict:
         if not self.llm:
             return {"answer": "⚠️ AI Coach is offline — no API key found. Add your **GEMINI_API_KEY** in Streamlit Cloud **Settings → Secrets**.", "source": None}
 
-        prompt = f"You are a real estate sales coach. Answer this question for a {role} ({experience}). Reply in plain text only — no JSON, no code blocks.\n\nQuestion: {query}"
+        pipeline_context = ""
+        if deals:
+            pipeline_context = "Current Active Sales Pipeline Status & Deals:\n"
+            for d in deals:
+                pipeline_context += f"- Account/Client: {d.get('accountName')} | Address: {d.get('propertyAddress')} | Value/Price: {d.get('dealValue')} | Stage: {d.get('stage')} | Type: {d.get('type')} | Assigned Agent: {d.get('agent')} | Action Tag: {d.get('tag')} | Status/Age: {d.get('age')}\n"
+
+        prompt = f"You are a real estate sales coach. Answer this question for a {role} ({experience}). Reply in plain text only — no JSON, no code blocks.\n\n"
+        if pipeline_context:
+            prompt += f"{pipeline_context}\n"
+        prompt += f"Question: {query}"
 
         if not self.retriever:
-            # No documents — use LLM directly without RAG
+            # No documents — use LLM directly with pipeline context
             try:
                 result = self.llm.invoke(prompt)
                 answer = clean_response(result.content if isinstance(result.content, str) else str(result.content))
-                return {"answer": answer, "source": "General AI (no docs indexed)"}
+                return {"answer": answer, "source": "General AI (grounded in Live Pipeline)"}
             except Exception as e:
                 if is_quota_error(e):
                     return {"answer": "🚫 **API Quota Exceeded** — Your free tier daily limit is used up.\n\n**Fix:** Enable billing at [aistudio.google.com](https://aistudio.google.com) or wait ~24 hrs for quota reset.", "source": None}
                 return {"answer": f"⚠️ Error: {str(e)[:200]}", "source": None}
 
+        # If retriever exists, fetch docs
         documents = self.retriever.invoke(query)
         sources = sorted({Path(doc.metadata.get("source", "Unknown")).name for doc in documents})
         context = "\n\n".join(doc.page_content for doc in documents)
-        if context.strip():
-            answer = self._llm_decision(query, context, role, experience)
-            return {"answer": answer, "source": ", ".join(sources)}
-        return {"answer": "Could not find relevant info in the knowledge base. Try uploading more documents.", "source": None}
+        
+        try:
+            answer = self._llm_decision(query, context, role, experience, pipeline_context)
+            src_str = ", ".join(sources) if sources else "Live Pipeline Context"
+            return {"answer": answer, "source": src_str}
+        except Exception as e:
+            return {"answer": f"⚠️ Error: {str(e)[:200]}", "source": None}
 
 
 
@@ -910,7 +925,7 @@ elif page == "AI Coach":
             role_str = profile["focus"]
             exp_str = profile["experience"]
             with st.spinner("Coach is thinking..."):
-                response = agent.ask(query, role_str, exp_str)
+                response = agent.ask(query, role_str, exp_str, deals=st.session_state.deals)
             st.session_state.chat_history.append({"role": "ai", "content": response["answer"], "source": response.get("source")})
             st.rerun()
 
