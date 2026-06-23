@@ -1,9 +1,7 @@
 import streamlit as st
 import os
-import shutil
 import json
 from pathlib import Path
-from typing import List
 
 # Import LangChain components
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -19,158 +17,338 @@ except ImportError:
 from langchain_community.vectorstores import FAISS
 from langchain_openai import ChatOpenAI
 
-# Load dotenv if available
+# Load dotenv for local dev
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
     pass
 
-# --- CONSTANTS & DIRECTORIES ---
+# --- CONSTANTS ---
 BASE_DIR = Path(__file__).resolve().parent
 KNOWLEDGE_BASE_DIR = BASE_DIR / "knowledge_base"
 KNOWLEDGE_BASE_DIR.mkdir(parents=True, exist_ok=True)
 
-# Page configuration
+# Page config
 st.set_page_config(
-    page_title="RealtyAI - Sales Manager Playbook",
+    page_title="RealtyAI — Sales Playbook",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for glassmorphic styling
+# ============================================================
+# GLOBAL CSS — matches Stitch mockup design system
+# ============================================================
 st.markdown("""
 <style>
-    /* Dark glass style containers */
-    .metric-card {
-        background: rgba(30, 37, 58, 0.4);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 12px;
-        padding: 1.25rem;
-        margin-bottom: 1rem;
-        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
-    }
-    .deal-card {
-        background: rgba(25, 30, 50, 0.65);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        border-radius: 8px;
-        padding: 0.85rem;
-        margin-bottom: 0.75rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-    }
-    .deal-title {
-        font-weight: 600;
-        color: #ffffff;
-        font-size: 0.95rem;
-        margin-bottom: 0.25rem;
-    }
-    .deal-desc {
-        font-size: 0.8rem;
-        color: #8e9bb4;
-        margin-bottom: 0.5rem;
-        line-height: 1.4;
-    }
-    .deal-meta {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-top: 1px solid rgba(255, 255, 255, 0.04);
-        padding-top: 0.4rem;
-        margin-top: 0.4rem;
-    }
-    .deal-val {
-        color: #38bdf8;
-        font-weight: 700;
-        font-size: 0.8rem;
-    }
-    .deal-act {
-        color: #3dd9b4;
-        background: rgba(61, 217, 180, 0.06);
-        padding: 1px 5px;
-        border-radius: 4px;
-        border: 1px solid rgba(61, 217, 180, 0.15);
-        font-size: 0.72rem;
-    }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+}
+
+/* ---- Sidebar ---- */
+[data-testid="stSidebar"] {
+    background: #0d3d2e !important;
+    border-right: 1px solid rgba(255,255,255,0.08);
+}
+[data-testid="stSidebar"] * {
+    color: #d4f0e6 !important;
+}
+[data-testid="stSidebar"] .stButton > button {
+    background: #1a6b4a !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    border-radius: 8px !important;
+    width: 100% !important;
+    font-weight: 600 !important;
+    padding: 0.5rem 1rem !important;
+    margin-top: 0.25rem !important;
+    transition: background 0.2s;
+}
+[data-testid="stSidebar"] .stButton > button:hover {
+    background: #22895f !important;
+}
+
+/* ---- Main area ---- */
+.main .block-container {
+    background: #f5f7f9;
+    padding: 1.5rem 2rem;
+    max-width: 1400px;
+}
+
+/* ---- Page title bar ---- */
+.page-header {
+    margin-bottom: 1.5rem;
+}
+.page-header h1 {
+    font-size: 1.85rem;
+    font-weight: 700;
+    color: #0d2418;
+    margin: 0 0 0.25rem 0;
+}
+.page-header p {
+    color: #6b7e74;
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+/* ---- Metric cards (Dashboard) ---- */
+.metric-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid #e8eef0;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+    margin-bottom: 1rem;
+}
+.metric-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #7a8f85;
+    margin-bottom: 0.35rem;
+}
+.metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #0d2418;
+    line-height: 1;
+}
+.metric-value.red { color: #e35b5b; }
+.metric-value.teal { color: #1a8f5f; }
+.metric-value.blue { color: #2a7acd; }
+.metric-sub {
+    font-size: 0.75rem;
+    color: #9aada5;
+    margin-top: 0.35rem;
+}
+
+/* ---- Pipeline deal cards ---- */
+.pipeline-col-header {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #0d2418;
+    padding: 0.5rem 0 0.75rem 0;
+    border-bottom: 2px solid #1a8f5f;
+    margin-bottom: 0.75rem;
+}
+.badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+}
+.badge-residential { background: #d4f0e6; color: #0d5f35; }
+.badge-commercial { background: #dbeafe; color: #1e40af; }
+.badge-investment { background: #fef3c7; color: #92400e; }
+.deal-card {
+    background: #ffffff;
+    border: 1px solid #e8eef0;
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+    margin-bottom: 0.65rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+.deal-name { font-weight: 600; font-size: 0.9rem; color: #0d2418; }
+.deal-addr { font-size: 0.78rem; color: #7a8f85; margin: 0.2rem 0 0.4rem 0; }
+.deal-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; }
+.deal-value { font-weight: 700; font-size: 0.8rem; color: #1a8f5f; }
+.deal-tag {
+    font-size: 0.68rem;
+    color: #6b7e74;
+    background: #f0f4f2;
+    padding: 2px 7px;
+    border-radius: 12px;
+}
+
+/* ---- Chat UI ---- */
+.chat-bubble-user {
+    background: #1a8f5f;
+    color: #ffffff;
+    border-radius: 12px 12px 2px 12px;
+    padding: 0.75rem 1rem;
+    margin: 0.5rem 0 0.5rem 20%;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+.chat-bubble-ai {
+    background: #ffffff;
+    color: #1a2820;
+    border: 1px solid #e8eef0;
+    border-radius: 12px 12px 12px 2px;
+    padding: 0.75rem 1rem;
+    margin: 0.5rem 20% 0.5rem 0;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+.chat-citation {
+    font-size: 0.7rem;
+    color: #9aada5;
+    margin-top: 0.4rem;
+}
+
+/* ---- SOP document card ---- */
+.sop-card {
+    background: #ffffff;
+    border: 1px solid #e8eef0;
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.sop-icon { font-size: 1.25rem; }
+.sop-name { font-weight: 600; font-size: 0.875rem; color: #0d2418; }
+.sop-meta { font-size: 0.72rem; color: #9aada5; }
+.sop-badge { font-size: 0.67rem; font-weight: 600; }
+
+/* ---- Action cards (Strategy tools) ---- */
+.tool-card {
+    background: #ffffff;
+    border: 1px solid #e8eef0;
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+.tool-card h4 { margin: 0 0 0.4rem 0; font-size: 0.925rem; color: #0d2418; }
+.tool-card p { margin: 0; font-size: 0.8rem; color: #7a8f85; }
+
+/* ---- Governance validation card ---- */
+.validation-box {
+    background: #f0faf4;
+    border: 1px solid #a7d7be;
+    border-radius: 10px;
+    padding: 1rem;
+    margin-top: 0.75rem;
+}
+
+/* ---- Live feed item ---- */
+.feed-item {
+    background: #ffffff;
+    border-radius: 8px;
+    border: 1px solid #e8eef0;
+    padding: 0.6rem 0.85rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+    color: #2d4a3a;
+}
+.feed-item strong { color: #0d2418; }
+
+/* ---- Tabs override ---- */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 0.5rem;
+    background: transparent;
+    border-bottom: 2px solid #dce8e2;
+}
+.stTabs [data-baseweb="tab"] {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #6b7e74;
+    padding: 0.4rem 1rem;
+    border-radius: 6px 6px 0 0;
+}
+.stTabs [aria-selected="true"] {
+    color: #1a8f5f !important;
+    border-bottom: 2px solid #1a8f5f !important;
+    font-weight: 700 !important;
+}
+
+/* ---- Section subheadings ---- */
+.section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0d2418;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid #e8eef0;
+}
+
+/* ---- New Analysis bottom CTA ---- */
+.sidebar-cta {
+    background: #1a6b4a;
+    color: white;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-align: center;
+    cursor: pointer;
+    margin-top: 1rem;
+}
+
+/* ---- Hide Streamlit chrome ---- */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
 
-# --- SESSION STATE INITIALIZATION ---
+# ============================================================
+# HELPERS — API KEY RESOLUTION
+# ============================================================
+def get_api_key():
+    """Read API key from Streamlit Cloud secrets, env, or session state."""
+    # 1. Streamlit secrets (production)
+    try:
+        return st.secrets["GEMINI_API_KEY"]
+    except Exception:
+        pass
+    # 2. Environment variable (local .env)
+    key = os.getenv("GEMINI_API_KEY", "")
+    if key:
+        return key
+    # 3. Manually entered in sidebar
+    return st.session_state.get("gemini_key", "")
+
+def get_model_name():
+    try:
+        return st.secrets.get("GEMINI_MODEL", "gemini-2.0-flash")
+    except Exception:
+        return os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+
+
+# ============================================================
+# SESSION STATE
+# ============================================================
 if "profile" not in st.session_state:
     st.session_state.profile = None
 
 if "deals" not in st.session_state:
-    # Initial seed data matching index.html
     st.session_state.deals = [
-        {
-            "id": 1,
-            "accountName": "Northwind Retail",
-            "propertyAddress": "120 Oak St",
-            "dealValue": "$18k GCI",
-            "stage": "Lead",
-            "context": "Buyer toured 120 Oak St. Follow-up email scheduled. Lead source: Zillow Inbound.",
-            "nextStep": "MLS Email follow-up"
-        },
-        {
-            "id": 2,
-            "accountName": "Blue Harbor Logistics",
-            "propertyAddress": "Valley Lot",
-            "dealValue": "$24k GCI",
-            "stage": "Lead",
-            "context": "Requested details on CRE industrial lot. Outbound reply sent.",
-            "nextStep": "Call client Monday"
-        },
-        {
-            "id": 3,
-            "accountName": "Atlas Components",
-            "propertyAddress": "440 River Road",
-            "dealValue": "$42k GCI",
-            "stage": "Discovery",
-            "context": "Toured 440 River Road. Budget verified. Pre-approval letters uploaded.",
-            "nextStep": "Send disclosure package"
-        },
-        {
-            "id": 4,
-            "accountName": "Pioneer Med",
-            "propertyAddress": "10 Pine St",
-            "dealValue": "$31k GCI",
-            "stage": "Discovery",
-            "context": "Consultation call complete. Specific 3-bath property requirements noted.",
-            "nextStep": "Schedule weekend tours"
-        },
-        {
-            "id": 5,
-            "accountName": "Summit Hospitality",
-            "propertyAddress": "555 Valley View",
-            "dealValue": "$55k GCI",
-            "stage": "Proposal",
-            "context": "Broker opinion of value generated. Listing agreement proposal sent.",
-            "nextStep": "Negotiate commission split"
-        },
-        {
-            "id": 6,
-            "accountName": "Greenline Foods",
-            "propertyAddress": "1045 River Rd",
-            "dealValue": "$64k GCI",
-            "stage": "Closed Won",
-            "context": "Represented buyer. Escrow closed, funds wired, keys delivered.",
-            "nextStep": "Archive client file"
-        }
+        {"id": 1, "accountName": "Marge Simpson", "propertyAddress": "742 Evergreen Terrace", "dealValue": "$845k", "stage": "Lead", "type": "Residential", "agent": "Logan Roy", "age": "2 days idle", "tag": "Follow up"},
+        {"id": 2, "accountName": "Logan Roy", "propertyAddress": "Harbor District Plaza", "dealValue": "$2.4M", "stage": "Lead", "type": "Commercial", "agent": "Logan Roy", "age": "4 hours ago", "tag": "Call Call"},
+        {"id": 3, "accountName": "Scotch Roy", "propertyAddress": "Oak Ridge Estates", "dealValue": "$1.2M", "stage": "Discovery", "type": "Residential", "agent": "Scotch Roy", "age": "1 week idle", "tag": "Stay Hot"},
+        {"id": 4, "accountName": "Roman Roy", "propertyAddress": "Skyline Heights Tower B", "dealValue": "$5.8M", "stage": "Proposal", "type": "Investment", "agent": "Roman Roy", "age": "active", "tag": "Under Legal"},
+        {"id": 5, "accountName": "Summit Group", "propertyAddress": "555 Valley View", "dealValue": "$3.1M", "stage": "Closed Won", "type": "Commercial", "agent": "Dave", "age": "closed", "tag": "Archive"},
     ]
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = [
-        {"role": "ai", "content": "Hello! Ask a question and I will search your sales playbook for tactical guidance.", "source": None}
+        {"role": "ai", "content": "Hello! I've finished analyzing your Q3 pipeline data. Your conversion rate on initial discovery calls is currently **18.4%**, which is slightly below the target of 22%.\n\nBased on your recent call recordings, we're seeing a drop-off during the 'Objection Handling' phase of the SOP. Would you like to deep-dive into the specific transcriptions or review the updated scripts?", "source": None}
     ]
 
 if "nb_chat_history" not in st.session_state:
     st.session_state.nb_chat_history = [
-        {"role": "ai", "content": "Hello! I am NotebookLM, grounded in your loaded team SOPs. Ask me a question to simulate query answers or click one of the suggestions below.", "citations": []}
+        {"role": "ai", "content": "Hello! I am grounded in your team SOPs. Ask me a question or use the suggestions below.", "citations": []}
     ]
 
+if "active_page" not in st.session_state:
+    st.session_state.active_page = "Dashboard"
 
-# --- RAG DECISION AGENT CLASS ---
+
+# ============================================================
+# RAG DECISION AGENT
+# ============================================================
 class StreamlitDecisionAgent:
     def __init__(self, kb_path: Path):
         self.kb_path = kb_path
@@ -178,51 +356,30 @@ class StreamlitDecisionAgent:
         self.retriever_tool = None
         self.llm = None
         self.llm_provider = None
-        
         self._setup_llm()
         self._setup_retriever()
 
     def _setup_llm(self):
-        # Read API key from Streamlit secrets, environment, or user state
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key and "gemini_key" in st.session_state:
-            api_key = st.session_state.gemini_key
-
+        api_key = get_api_key()
         if api_key:
-            model_name = os.getenv("GEMINI_MODEL", "gemma-2-27b-it")
+            model_name = get_model_name()
             self.llm = ChatOpenAI(
                 model=model_name,
                 api_key=api_key,
                 base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-                temperature=0.2
+                temperature=0.3
             )
             self.llm_provider = "gemini"
 
     def _load_documents(self):
-        txt_loader = DirectoryLoader(
-            str(self.kb_path),
-            glob="**/*.txt",
-            loader_cls=TextLoader,
-            loader_kwargs={"encoding": "utf-8"},
-            show_progress=False,
-        )
-        md_loader = DirectoryLoader(
-            str(self.kb_path),
-            glob="**/*.md",
-            loader_cls=TextLoader,
-            loader_kwargs={"encoding": "utf-8"},
-            show_progress=False,
-        )
-        pdf_loader = DirectoryLoader(
-            str(self.kb_path),
-            glob="**/*.pdf",
-            loader_cls=PyPDFLoader,
-            show_progress=False,
-        )
-
         documents = []
-        for loader in [txt_loader, md_loader, pdf_loader]:
+        for glob, cls, kwargs in [
+            ("**/*.txt", TextLoader, {"loader_kwargs": {"encoding": "utf-8"}}),
+            ("**/*.md",  TextLoader, {"loader_kwargs": {"encoding": "utf-8"}}),
+            ("**/*.pdf", PyPDFLoader, {}),
+        ]:
             try:
+                loader = DirectoryLoader(str(self.kb_path), glob=glob, loader_cls=cls, show_progress=False, **kwargs)
                 documents.extend(loader.load())
             except Exception:
                 pass
@@ -231,20 +388,14 @@ class StreamlitDecisionAgent:
     def _setup_retriever(self):
         self.retriever = None
         self.retriever_tool = None
-
         if not self.kb_path.exists():
             return
-
         documents = self._load_documents()
         if not documents:
             return
-
         splitter = RecursiveCharacterTextSplitter(chunk_size=900, chunk_overlap=120)
         chunks = splitter.split_documents(documents)
-
-        # Uses FakeEmbeddings since Gemini compatible embeddings aren't supported
         embeddings = FakeEmbeddings(size=1536)
-        
         vector_store = FAISS.from_documents(chunks, embedding=embeddings)
         self.retriever = vector_store.as_retriever(search_kwargs={"k": 4})
         self.retriever_tool = create_retriever_tool(
@@ -254,10 +405,9 @@ class StreamlitDecisionAgent:
         )
 
     def _llm_decision(self, query: str, context: str, role: str, experience: str) -> dict:
-        prompt = f"""
-You are a sales enablement decision agent.
-The user is a {role} in a real estate firm, with {experience} level of experience.
-Use only the context below to answer the user question. Tailor your language, tone, and guidance to their role and experience level.
+        prompt = f"""You are a senior real estate sales enablement coach.
+The user is a {role} with {experience} experience.
+Use only the context below to answer. Be concise, actionable, and tailor your tone to their experience level.
 
 Context:
 {context}
@@ -265,597 +415,763 @@ Context:
 Question:
 {query}
 
-Return strictly valid JSON with this schema:
-{{
-  "sufficient": boolean,
-  "reasoning": "short explanation",
-  "answer": "final answer for the user",
-  "confidence": "low|medium|high"
-}}
+Return strictly valid JSON:
+{{"sufficient": true, "answer": "...", "confidence": "high|medium|low"}}
 """
         try:
             result = self.llm.invoke(prompt)
             content = result.content if isinstance(result.content, str) else str(result.content)
-            
-            # Simple JSON parse extraction
             start = content.find("{")
             end = content.rfind("}")
             if start != -1 and end != -1:
                 return json.loads(content[start:end+1])
             return json.loads(content)
         except Exception as e:
-            return {
-                "sufficient": True,
-                "reasoning": f"Parsing/LLM Error: {e}",
-                "answer": "Error communicating with Gemini model. Please double check your API key.",
-                "confidence": "low"
-            }
+            return {"sufficient": True, "answer": f"Error: {e}", "confidence": "low"}
 
     def ask(self, query: str, role: str, experience: str) -> dict:
         if not self.llm:
-            return {
-                "answer": "AI Coach is in Offline Mode. Please add your Gemini API Key in the sidebar to retrieve playbook insights.",
-                "source": "Local System Indicator",
-                "sufficient": False,
-                "reasoning": "No LLM loaded."
-            }
-            
+            return {"answer": "⚠️ AI Coach is offline — no API key found. Add your GEMINI_API_KEY in Streamlit Cloud Secrets (Settings → Secrets).", "source": None}
         if not self.retriever:
-            return {
-                "answer": "The knowledge base index is empty. Please upload some files in the AI Coach tab to enrich the RAG agent.",
-                "source": "System RAG Loader",
-                "sufficient": False,
-                "reasoning": "No files found."
-            }
-
+            # No documents — use LLM directly without RAG
+            try:
+                result = self.llm.invoke(f"You are a real estate sales coach. Answer this question for a {role} ({experience}): {query}")
+                answer = result.content if isinstance(result.content, str) else str(result.content)
+                return {"answer": answer, "source": "General AI (no docs indexed)"}
+            except Exception as e:
+                return {"answer": f"LLM error: {e}", "source": None}
         documents = self.retriever.invoke(query)
-        sources = sorted({Path(doc.metadata.get("source", "Unknown source")).name for doc in documents})
+        sources = sorted({Path(doc.metadata.get("source", "Unknown")).name for doc in documents})
         context = "\n\n".join(doc.page_content for doc in documents)
-
         if context.strip():
             decision = self._llm_decision(query, context, role, experience)
-            return {
-                "answer": decision.get("answer", "No answer found."),
-                "source": ", ".join(sources),
-                "sufficient": decision.get("sufficient", False),
-                "reasoning": decision.get("reasoning", "Parsed from RAG content.")
-            }
-            
-        return {
-            "answer": "I could not find enough relevant information in the knowledge base for that query. Try uploading more strategy files.",
-            "source": "Fallback Matcher",
-            "sufficient": False,
-            "reasoning": "Zero document hits."
-        }
+            return {"answer": decision.get("answer", "No answer found."), "source": ", ".join(sources)}
+        return {"answer": "Could not find relevant info. Try uploading more documents.", "source": None}
 
 
-# --- PROFILE ONBOARDING DIALOG ---
-@st.dialog("Welcome to RealtyAI Onboarding")
-def onboarding_modal():
-    st.write("Configure your sales workspace to personalize the RAG playbook templates and AI coach responses.")
-    name = st.text_input("Manager Name", placeholder="Dave Smith")
-    focus = st.selectbox("Real Estate Focus", ["Residential Brokerage", "Commercial Real Estate (CRE)", "Property Developer"])
-    exp = st.selectbox("AI Maturity Level / Experience", ["Junior User (Occasional AI)", "Mid Operator (Structured prompting)", "Senior Builder (GPTs & RAG)"])
-    savings = st.number_input("Weekly Time Saving Target (Hours)", min_value=5, max_value=30, value=16)
-    
-    st.info("You can also add your Gemini API Key below to activate the RAG coach chatbot.")
-    gemini_key = st.text_input("Gemini API Key", type="password", help="Enter your Gemini API key from Google AI Studio")
-
-    if st.button("Launch Playbook Workspace"):
-        if name.strip() == "":
-            st.error("Please enter your name.")
-            return
-        
-        st.session_state.profile = {
-            "name": name,
-            "focus": focus,
-            "experience": exp,
-            "targetSavings": savings
-        }
-        if gemini_key:
-            st.session_state.gemini_key = gemini_key
-        st.rerun()
-
-
-# --- SIDEBAR WIDGETS ---
+# ============================================================
+# SIDEBAR
+# ============================================================
 with st.sidebar:
-    st.markdown('<div style="display: flex; align-items: center; gap: 8px;"><div style="background:#3dd9b4; color:#0f1322; width:32px; height:32px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.1rem; box-shadow:0 0 10px rgba(61,217,180,0.4)">⚡</div><h2 style="margin:0; font-size:1.25rem;">RealtyAI</h2></div>', unsafe_allow_html=True)
-    st.markdown('<span style="font-size:0.65rem; color:#3dd9b4; text-transform:uppercase; letter-spacing:1px;">Playbook Engine</span>', unsafe_allow_html=True)
-    st.write("---")
+    # Logo
+    st.markdown("""
+    <div style="padding: 0.5rem 0 1.25rem 0;">
+        <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.25rem;">
+            <div style="background:#1a8f5f; border-radius:8px; width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; box-shadow:0 0 12px rgba(26,143,95,0.4);">⚡</div>
+            <div>
+                <div style="font-weight:800; font-size:1.05rem; color:#ffffff; line-height:1.1;">RealtyAI</div>
+                <div style="font-size:0.6rem; color:#7db89a; text-transform:uppercase; letter-spacing:1.5px;">Premium Intelligence</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    if not st.session_state.profile:
-        st.write("👋 Welcome! Please configure your profile to personalize the playbook.")
-        if st.button("Run Profile Setup"):
-            onboarding_modal()
+    # Nav pages
+    pages = {
+        "Dashboard":   "📊",
+        "Pipeline":    "📋",
+        "AI Coach":    "🤖",
+        "SOPs":        "📚",
+        "Strategy Tools": "🛠",
+    }
+    for page, icon in pages.items():
+        is_active = st.session_state.active_page == page
+        btn_style = "background:#1a8f5f !important;" if is_active else ""
+        if st.button(f"{icon}  {page}", key=f"nav_{page}", use_container_width=True):
+            st.session_state.active_page = page
+            st.rerun()
+
+    st.markdown("---")
+
+    # Profile
+    if st.session_state.profile:
+        p = st.session_state.profile
+        st.markdown(f"""
+        <div style="background:rgba(255,255,255,0.07); border-radius:8px; padding:0.75rem; margin-bottom:0.75rem;">
+            <div style="font-weight:700; font-size:0.85rem;">{p['name']}</div>
+            <div style="font-size:0.72rem; color:#7db89a; margin-top:0.2rem;">{p['focus']}</div>
+            <div style="font-size:0.68rem; color:#5d8a72; margin-top:0.15rem;">{p['experience']}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Edit Profile", use_container_width=True):
+            st.session_state.profile = None
+            st.rerun()
     else:
-        # Show Profile Info Card
-        st.markdown(f"**Manager:** {st.session_state.profile['name']}")
-        st.markdown(f"**Focus:** {st.session_state.profile['focus']}")
-        st.markdown(f"**Exp:** {st.session_state.profile['experience']}")
-        
-        if st.button("Edit Workspace Profile"):
-            onboarding_modal()
-            
-    st.write("---")
-    
-    # API key override
-    st.subheader("API Keys")
-    api_placeholder = st.session_state.get("gemini_key", "")
-    key_val = st.text_input("Gemini API Key", type="password", value=api_placeholder, placeholder="Grounded RAG Key")
-    if key_val and key_val != api_placeholder:
-        st.session_state.gemini_key = key_val
-        st.success("API key updated!")
-        
-    st.write("---")
-    
-    # Weekly progress bar widget
-    st.subheader("Weekly Reclaimed Time")
-    
-    # Simple hour calculation base toggles
-    meetings_tog = st.checkbox("MS Teams Recap (Meetings)", value=True, help="Saves ~5h/wk")
-    emails_tog = st.checkbox("ACP Prompting (Emails)", value=False, help="Saves ~4h/wk")
-    data_tog = st.checkbox("Copilot in Excel (Data Entry)", value=False, help="Saves ~3.5h/wk")
-    searching_tog = st.checkbox("NotebookLM SOP (Search)", value=True, help="Saves ~2.5h/wk")
-    
-    reclaimed = 0.0
-    if meetings_tog: reclaimed += 5.0
-    if emails_tog: reclaimed += 4.0
-    if data_tog: reclaimed += 3.5
-    if searching_tog: reclaimed += 2.5
-    
-    target_hours = st.session_state.profile["targetSavings"] if st.session_state.profile else 16.0
-    progress_val = min(reclaimed / target_hours, 1.0)
-    
-    st.progress(progress_val)
-    st.write(f"**Reclaimed:** {reclaimed:.1f}h / {target_hours:.0f}h")
-    st.write(f"Progress: {int(progress_val*100)}%")
+        st.info("Set up your profile to personalise the AI coach.")
+
+    st.markdown("---")
+
+    # API key section
+    st.markdown('<div style="font-size:0.72rem; font-weight:600; color:#7db89a; text-transform:uppercase; letter-spacing:1px; margin-bottom:0.5rem;">API Configuration</div>', unsafe_allow_html=True)
+    existing_key = get_api_key()
+    if existing_key:
+        st.markdown('<div style="font-size:0.78rem; color:#4caf82;">✅ Gemini API key active</div>', unsafe_allow_html=True)
+    else:
+        key_input = st.text_input("Gemini API Key", type="password", placeholder="AIza...", help="Or add GEMINI_API_KEY to Streamlit Secrets")
+        if key_input:
+            st.session_state.gemini_key = key_input
+            st.success("Key saved!")
+            st.rerun()
+
+    st.markdown("---")
+    st.markdown("""
+    <div style="font-size:0.72rem; color:#5d8a72; text-align:center; padding-top:0.5rem;">
+        RealtyAI v2.0 · Playbook Engine<br>
+        <span style="color:#3a6b52;">Powered by Gemini</span>
+    </div>
+    """, unsafe_allow_html=True)
 
 
-# --- MAIN TABS ROUTING ---
-st.title("Sales Manager AI Playbook")
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Dashboard", "📋 Pipeline Board", "💬 AI Coach", "📚 SOP Knowledge Base", "🛠 Strategy Tools"])
+# ============================================================
+# ONBOARDING — shown when no profile
+# ============================================================
+if not st.session_state.profile:
+    st.markdown("""
+    <div style="max-width:520px; margin:4rem auto; background:#ffffff; border-radius:16px; padding:2.5rem; box-shadow:0 4px 24px rgba(0,0,0,0.1); border:1px solid #e8eef0;">
+        <div style="text-align:center; margin-bottom:1.5rem;">
+            <div style="font-size:2.5rem;">⚡</div>
+            <h2 style="margin:0.5rem 0 0.25rem; color:#0d2418;">Welcome to RealtyAI</h2>
+            <p style="color:#7a8f85; font-size:0.875rem; margin:0;">Configure your workspace to personalise the playbook</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.form("onboarding_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            name = st.text_input("Your Name", placeholder="Ryan Oliver")
+        with col2:
+            focus = st.selectbox("Real Estate Focus", ["Residential Brokerage", "Commercial Real Estate (CRE)", "Property Developer"])
+        exp = st.selectbox("Experience Level", ["Junior (0–3 years)", "Mid-Level (3–8 years)", "Senior (8+ years)"])
+        savings = st.slider("Weekly Time Saving Target (hrs)", 5, 30, 16)
+
+        submitted = st.form_submit_button("🚀 Launch Playbook Workspace", use_container_width=True)
+        if submitted:
+            if not name.strip():
+                st.error("Please enter your name.")
+            else:
+                st.session_state.profile = {"name": name.strip(), "focus": focus, "experience": exp, "targetSavings": savings}
+                st.rerun()
+    st.stop()
 
 
-# --- TAB 1: DASHBOARD ---
-with tab1:
+# ============================================================
+# PAGE ROUTING
+# ============================================================
+page = st.session_state.active_page
+profile = st.session_state.profile
+
+
+# ============================================================
+# PAGE 1 — DASHBOARD OVERVIEW
+# ============================================================
+if page == "Dashboard":
+    st.markdown(f"""
+    <div class="page-header">
+        <h1>Intelligence Dashboard</h1>
+        <p>Operational efficiency and strategic growth markers · {profile['focus']}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Top metric row
     col1, col2, col3 = st.columns(3)
-    
     with col1:
-        st.markdown(f"""
-        <div class="metric-card" style="border-left: 3px solid #f87171;">
-            <div style="font-size:0.75rem; color:#8e9bb4; font-weight:600; text-transform:uppercase;">Estimated Time Waste</div>
-            <h3 style="font-size:1.6rem; color:#f87171; margin-top:0.25rem; font-weight:800;">{max(12.0 - reclaimed, 0.0):.1f}-{max(18.0 - reclaimed, 0.0):.1f} Hours</h3>
-            <span style="font-size:0.72rem; color:#8e9bb4;">Leaking Current Week</span>
+        st.markdown("""
+        <div class="metric-card">
+            <div class="metric-label">⏱ Time Waste</div>
+            <div class="metric-value red">12.4 hrs</div>
+            <div class="metric-sub">/ week · Manual operational redundancies</div>
         </div>
         """, unsafe_allow_html=True)
-        
     with col2:
-        focus_goal = "Maximize GCI"
-        focus_sub = "Reduce Days on Market"
-        if st.session_state.profile:
-            if st.session_state.profile["focus"] == "Commercial Real Estate (CRE)":
-                focus_goal = "Broker Deals"
-                focus_sub = "Optimize Lease Volume"
-            elif st.session_state.profile["focus"] == "Property Developer":
-                focus_goal = "Sell Inventory"
-                focus_sub = "Onboard Off-Plan Units"
-                
-        st.markdown(f"""
-        <div class="metric-card" style="border-left: 3px solid #38bdf8;">
-            <div style="font-size:0.75rem; color:#8e9bb4; font-weight:600; text-transform:uppercase;">Operational Focus Goal</div>
-            <h3 style="font-size:1.6rem; color:#ffffff; margin-top:0.25rem; font-weight:800;">{focus_goal}</h3>
-            <span style="font-size:0.72rem; color:#8e9bb4;">{focus_sub}</span>
+        st.markdown("""
+        <div class="metric-card">
+            <div class="metric-label">🎯 Operational Focus</div>
+            <div class="metric-value teal">86%</div>
+            <div class="metric-sub">+2% · Strategic client interaction vs. admin tasks</div>
         </div>
         """, unsafe_allow_html=True)
-        
     with col3:
-        st.markdown(f"""
-        <div class="metric-card" style="border-left: 3px solid #3dd9b4;">
-            <div style="font-size:0.75rem; color:#8e9bb4; font-weight:600; text-transform:uppercase;">AI Target State Goal</div>
-            <h3 style="font-size:1.6rem; color:#3dd9b4; margin-top:0.25rem; font-weight:800;">Reclaim {int((reclaimed/target_hours)*100)}%</h3>
-            <span style="font-size:0.72rem; color:#8e9bb4;">~{reclaimed:.1f}h of {target_hours:.0f}h Target</span>
+        st.markdown("""
+        <div class="metric-card" style="background:#0d3d2e; border-color:#1a8f5f;">
+            <div class="metric-label" style="color:#7db89a;">⚡ AI Target State Goal</div>
+            <div class="metric-value" style="color:#ffffff;">95%</div>
+            <div class="metric-sub" style="color:#7db89a;">Q4 Projection · Automation saturation goal</div>
         </div>
         """, unsafe_allow_html=True)
 
-    # Split: Time leak table & Guardrails
-    dash_col1, dash_col2 = st.columns([1.2, 1])
-    
-    with dash_col1:
-        st.subheader("Operational Time Leak Breakdown")
-        st.write("Deploy target AI solutions to reclaim hours from recurring organizational drag activities:")
-        
-        st.markdown(f"""
-        | Activity | Weekly Leak | Target AI Solution | Status |
-        |---|---|---|---|
-        | **Inefficient Meetings** | 4-6 Hours | MS Teams Recap | {'🟢 Deployed' if meetings_tog else '🔴 Stalled'} |
-        | **Repetitive Emails** | 3-5 Hours | ACP Prompt Engine | {'🟢 Deployed' if emails_tog else '🔴 Stalled'} |
-        | **Manual Data Entry** | 3-4 Hours | Copilot in Excel | {'🟢 Deployed' if data_tog else '🔴 Stalled'} |
-        | **Searching SOPs** | 2-3 Hours | NotebookLM SOP Chat | {'🟢 Deployed' if searching_tog else '🔴 Stalled'} |
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    left_col, right_col = st.columns([1.4, 1])
+
+    with left_col:
+        # Time Leak Calculator
+        st.markdown('<div class="section-title">⏳ Time Leak Calculator</div>', unsafe_allow_html=True)
+        st.markdown("""
+        <div class="metric-card">
+            <p style="color:#7a8f85; font-size:0.85rem; margin:0 0 1rem 0;">Quantify the financial impact of manual operational leaks within your sales pipeline.</p>
         """, unsafe_allow_html=True)
-        
-    with dash_col2:
-        st.subheader("AI Governance & Usage Guardrails")
-        guard_mode = st.radio("Guardrail Mode", ["Policy Viewer", "Scenario Tester"], horizontal=True)
-        
+
+        hours_admin = st.slider("Weekly hours on admin tasks", 0, 40, 14)
+        avg_commission = st.number_input("Avg. Commission Value ($)", value=12500, step=500)
+        revenue_lost = int((hours_admin / 40) * avg_commission * 4)
+
+        st.markdown(f"""
+        <div style="display:flex; gap:1.5rem; margin-top:0.75rem;">
+            <div><div style="font-size:0.7rem; color:#9aada5; text-transform:uppercase;">Weekly hrs on Admin</div><div style="font-size:1.5rem; font-weight:700; color:#e35b5b;">{hours_admin}h</div></div>
+            <div><div style="font-size:0.7rem; color:#9aada5; text-transform:uppercase;">Annual Revenue Loss</div><div style="font-size:1.5rem; font-weight:700; color:#0d2418;">${revenue_lost:,}</div></div>
+        </div>
+        <div style="margin-top:1rem;">
+        """, unsafe_allow_html=True)
+
+        if st.button("📊 Plug the Leak →", key="plug_leak"):
+            st.success("RealtyAI typically recovers 65% of this lost time within the first 3 months. Check the Strategy Tools tab to get started.")
+        st.markdown("</div></div>", unsafe_allow_html=True)
+
+        # High-priority pipeline
+        st.markdown('<br><div class="section-title">📋 High-Priority Pipeline</div>', unsafe_allow_html=True)
+        top_deals = [d for d in st.session_state.deals if d["stage"] in ["Proposal", "Discovery"]]
+        if top_deals:
+            for d in top_deals[:3]:
+                confidence = "92%" if d["stage"] == "Proposal" else "76%"
+                conf_color = "#1a8f5f" if d["stage"] == "Proposal" else "#e38a1a"
+                st.markdown(f"""
+                <div style="display:flex; justify-content:space-between; align-items:center; background:#ffffff; border:1px solid #e8eef0; border-radius:8px; padding:0.65rem 1rem; margin-bottom:0.5rem;">
+                    <div>
+                        <div style="font-weight:600; font-size:0.875rem; color:#0d2418;">{d['accountName']} — {d['propertyAddress']}</div>
+                        <div style="font-size:0.72rem; color:#9aada5;">{d['type']} · {d['stage']}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:0.8rem; font-weight:700; color:{conf_color};">AI Confidence {confidence}</div>
+                        <div style="font-size:0.7rem; color:#9aada5;">{d['dealValue']}</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+    with right_col:
+        # Live feed
+        st.markdown('<div class="section-title">📡 Live Feed</div>', unsafe_allow_html=True)
+        feed_items = [
+            ("🤖 Automation Deployed", "Property Matching Module • 6h ago"),
+            ("💡 Insight Generated", "Pipeline Velocity Alert · Listings"),
+            ("📄 Report Prepared", "Weekly Growth Summary · 8 Apr"),
+        ]
+        for title, sub in feed_items:
+            st.markdown(f"""
+            <div class="feed-item">
+                <strong>{title}</strong><br>{sub}
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        # Governance guardrails
+        st.markdown('<div class="section-title">🛡 AI Guardrails</div>', unsafe_allow_html=True)
+        guard_mode = st.radio("Mode", ["Policy Viewer", "Scenario Tester"], horizontal=True, label_visibility="collapsed")
+
         if guard_mode == "Policy Viewer":
-            col_g1, col_g2 = st.columns(2)
-            with col_g1:
-                st.success("🟢 Green Light (Approved)")
-                st.write("""
-                - Drafting property follow-ups
-                - Meeting summaries
-                - CRM metric extractions
-                - Generating listing copy
-                """)
-            with col_g2:
-                st.error("🔴 Red Light (Human-Only)")
-                st.write("""
-                - Closing high-value negotiations
-                - Dispute split arbitration
-                - Final legal contract reviews
-                - Agent terminations
-                """)
+            st.markdown("""
+            <div style="background:#f0faf4; border:1px solid #a7d7be; border-radius:8px; padding:0.75rem; margin-bottom:0.5rem; font-size:0.8rem;">
+                <strong style="color:#0d5f35;">🟢 Green Light (AI Approved)</strong><br>
+                <ul style="margin:0.4rem 0 0 1rem; color:#2d6048;">
+                    <li>Draft property follow-ups & listing copy</li>
+                    <li>Meeting summaries & CRM extractions</li>
+                </ul>
+            </div>
+            <div style="background:#fff5f5; border:1px solid #f5c6c6; border-radius:8px; padding:0.75rem; font-size:0.8rem;">
+                <strong style="color:#9b1c1c;">🔴 Red Light (Human-Only)</strong><br>
+                <ul style="margin:0.4rem 0 0 1rem; color:#7f1d1d;">
+                    <li>Closing high-value negotiations</li>
+                    <li>Legal contract reviews & terminations</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
         else:
-            st.write("Evaluate a task for AI suitability instantly:")
-            
-            # Quick Scenario buttons
-            quick_test = st.selectbox("Quick Scenarios", ["-- Select a test task --", "Draft listing description from features", "Terminate an agent for performance", "Extract monthly GCI count", "Resolve broker split commission dispute"])
-            
-            scenario_text = ""
-            if quick_test != "-- Select a test task --":
-                scenario_text = quick_test
-                
-            test_query = st.text_input("Enter your custom task scenario:", value=scenario_text)
-            
-            if st.button("Evaluate Suitability"):
+            test_query = st.text_input("Enter task scenario:", placeholder="Draft listing description from features")
+            if st.button("Evaluate"):
                 lower = test_query.lower()
-                red_keywords = ["terminate", "fire", "promote", "hire", "negotiate", "dispute", "lawsuit", "contract review", "commission split", "firing"]
-                green_keywords = ["draft", "summary", "transcript", "listing", "email", "crm", "metric", "description", "write follow-up"]
-                
-                if any(kw in lower for kw in red_keywords):
-                    st.error("🔴 **RED LIGHT: Human-Only Mandated**\n\nCRITICAL: This activity involves legally binding negotiations or sensitive HR/personnel management. Do not automate with AI.")
-                elif any(kw in lower for kw in green_keywords):
-                    st.success("🟢 **GREEN LIGHT: AI Approved Task**\n\nThis task is administrative or drafts low-stakes copy. You can deploy AI templates safely.")
+                red = ["terminate", "fire", "negotiate", "dispute", "lawsuit", "contract review", "commission split"]
+                green = ["draft", "summary", "listing", "email", "crm", "description", "transcript"]
+                if any(k in lower for k in red):
+                    st.error("🔴 **RED LIGHT** — Human-Only Mandated. Do not automate.")
+                elif any(k in lower for k in green):
+                    st.success("🟢 **GREEN LIGHT** — AI Approved. Safe to deploy templates.")
                 else:
-                    st.warning("🟡 **YELLOW LIGHT: Conditional Policy Check**\n\nSafety parameters could not be verified automatically. Check results thoroughly and remove any PII before using AI.")
+                    st.warning("🟡 **YELLOW LIGHT** — Manual review required before proceeding.")
 
 
-# --- TAB 2: PIPELINE BOARD ---
-with tab2:
-    st.subheader("Deal & Listing Pipeline")
-    st.write("Track clients, property listings, and active deals across stages:")
-    
-    # Deal Wizard Form
-    with st.expander("➕ Launch Deal Wizard (Add New Deal Card)"):
+# ============================================================
+# PAGE 2 — PIPELINE BOARD
+# ============================================================
+elif page == "Pipeline":
+    st.markdown("""
+    <div class="page-header">
+        <h1>Sales Pipeline</h1>
+        <p>Manage your residential and commercial opportunities</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # New lead form
+    with st.expander("➕ New Lead / Deal Card"):
         with st.form("new_deal_form"):
-            c_name = st.text_input("Client Name", placeholder="Sarah Connor")
-            c_addr = st.text_input("Property Address", placeholder="1045 River Rd")
-            c_val = st.text_input("Listing Price / GCI Value", placeholder="$450,000 / $18k GCI")
-            c_stage = st.selectbox("Pipeline Stage", ["Lead", "Discovery", "Proposal", "Closed Won"])
-            c_context = st.text_area("Context / Negotiation Details", placeholder="Buyer liked layout but requested roof credit.")
-            c_next = st.text_input("Next Action", placeholder="Send inspector details")
-            
-            submit_deal = st.form_submit_button("Create Deal Card")
-            if submit_deal:
-                if c_name.strip() == "" or c_addr.strip() == "":
-                    st.error("Please fill in Client Name and Property Address.")
-                else:
-                    new_id = max([d["id"] for d in st.session_state.deals]) + 1 if st.session_state.deals else 1
+            c1, c2 = st.columns(2)
+            with c1:
+                c_name = st.text_input("Client / Account Name", placeholder="Sarah Connor")
+                c_addr = st.text_input("Property Address", placeholder="1045 River Rd")
+                c_val = st.text_input("Deal Value / GCI", placeholder="$450k / $18k GCI")
+            with c2:
+                c_type = st.selectbox("Property Type", ["Residential", "Commercial", "Investment"])
+                c_stage = st.selectbox("Pipeline Stage", ["Lead", "Discovery", "Proposal", "Closed Won"])
+                c_agent = st.text_input("Assigned Agent", placeholder="Logan Roy")
+            c_tag = st.text_input("Action Tag", placeholder="Follow up")
+            if st.form_submit_button("Create Deal Card", use_container_width=True):
+                if c_name.strip() and c_addr.strip():
+                    new_id = max([d["id"] for d in st.session_state.deals], default=0) + 1
                     st.session_state.deals.append({
-                        "id": new_id,
-                        "accountName": c_name,
-                        "propertyAddress": c_addr,
-                        "dealValue": c_val,
-                        "stage": c_stage,
-                        "context": c_context,
-                        "nextStep": c_next
+                        "id": new_id, "accountName": c_name, "propertyAddress": c_addr,
+                        "dealValue": c_val, "stage": c_stage, "type": c_type,
+                        "agent": c_agent, "age": "just now", "tag": c_tag
                     })
                     st.success(f"Deal for {c_name} created!")
                     st.rerun()
+                else:
+                    st.error("Client name and property address are required.")
 
-    # Columns display
-    col_lead, col_disc, col_prop, col_won = st.columns(4)
-    stages = [("Lead", col_lead), ("Discovery", col_disc), ("Proposal", col_prop), ("Closed Won", col_won)]
-    
-    for stage_name, col in stages:
+    # Kanban columns
+    stage_defs = ["Lead", "Discovery", "Proposal", "Closed Won"]
+    cols = st.columns(4)
+
+    type_badge = {
+        "Residential": "badge-residential",
+        "Commercial":  "badge-commercial",
+        "Investment":  "badge-investment",
+    }
+
+    for col, stage in zip(cols, stage_defs):
         with col:
-            stage_deals = [d for d in st.session_state.deals if d["stage"] == stage_name]
-            st.markdown(f"### {stage_name} ({len(stage_deals)})")
-            st.write("---")
-            
+            stage_deals = [d for d in st.session_state.deals if d["stage"] == stage]
+            total_val = len(stage_deals)
+            st.markdown(f"""
+            <div class="pipeline-col-header">
+                ● {stage} &nbsp;<span style="background:#e8f5ee; color:#1a8f5f; border-radius:10px; padding:1px 8px; font-size:0.75rem;">{total_val}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
             for deal in stage_deals:
-                # Render deal container card
-                with st.container():
-                    st.markdown(f"""
-                    <div class="deal-card">
-                        <div class="deal-title">{deal['accountName']}</div>
-                        <div class="deal-desc">{deal['propertyAddress']} - {deal['context']}</div>
-                        <div class="deal-meta">
-                            <span class="deal-val">{deal['dealValue']}</span>
-                            <span class="deal-act">{deal['nextStep']}</span>
-                        </div>
+                badge_class = type_badge.get(deal.get("type", "Residential"), "badge-residential")
+                st.markdown(f"""
+                <div class="deal-card">
+                    <span class="badge {badge_class}">{deal.get('type','Residential')}</span>
+                    <div style="font-size:0.7rem; color:#9aada5; float:right;">{deal.get('dealValue','')}</div>
+                    <div style="clear:both; margin-top:0.4rem;" class="deal-name">{deal['accountName']}</div>
+                    <div class="deal-addr">{deal['propertyAddress']}</div>
+                    <div style="font-size:0.72rem; color:#9aada5;">{deal.get('agent','')} · {deal.get('age','')}</div>
+                    <div class="deal-footer">
+                        <span class="deal-tag">{deal.get('tag','')}</span>
                     </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Selectbox to move stage (simulating drag-and-drop actions)
-                    idx = ["Lead", "Discovery", "Proposal", "Closed Won"].index(stage_name)
-                    new_stage = st.selectbox("Move stage:", ["Lead", "Discovery", "Proposal", "Closed Won"], index=idx, key=f"move_{deal['id']}")
-                    
-                    if new_stage != stage_name:
-                        # Update stage
-                        for d in st.session_state.deals:
-                            if d["id"] == deal["id"]:
-                                d["stage"] = new_stage
-                        st.rerun()
+                </div>
+                """, unsafe_allow_html=True)
+
+                current_idx = stage_defs.index(stage)
+                new_stage = st.selectbox("Move to:", stage_defs, index=current_idx, key=f"move_{deal['id']}", label_visibility="collapsed")
+                if new_stage != stage:
+                    for d in st.session_state.deals:
+                        if d["id"] == deal["id"]:
+                            d["stage"] = new_stage
+                    st.rerun()
 
 
-# --- TAB 3: AI COACH ---
-with tab3:
-    st.subheader("AI Playbook Assistant & RAG Index")
-    
-    coach_col1, coach_col2 = st.columns([2, 1])
-    
-    # Initialize Agent
+# ============================================================
+# PAGE 3 — AI COACH
+# ============================================================
+elif page == "AI Coach":
+    st.markdown("""
+    <div class="page-header">
+        <h1>AI Coach</h1>
+        <p>RAG-powered sales advisor grounded in your knowledge base</p>
+    </div>
+    """, unsafe_allow_html=True)
+
     agent = StreamlitDecisionAgent(KNOWLEDGE_BASE_DIR)
-    
-    with coach_col1:
-        st.write("Interact with your RAG Coach grounded in internal SOP documents:")
-        
-        # Render Chat History
-        for msg in st.session_state.chat_history:
-            role_label = "👤 User" if msg["role"] == "user" else "🤖 Coach"
-            with st.chat_message(msg["role"]):
-                st.write(f"**{role_label}**")
-                st.write(msg["content"])
-                if msg.get("source"):
-                    st.caption(f"Source: {msg['source']}")
-                    
-        # User input query
-        query = st.chat_input("Ask a playbook query (e.g. How to handle pricing adjustments?):")
+    api_active = bool(get_api_key())
+
+    chat_col, kb_col = st.columns([2.2, 1])
+
+    with chat_col:
+        if not api_active:
+            st.warning("⚠️ No API key detected. Add **GEMINI_API_KEY** to Streamlit Cloud **Settings → Secrets** to enable the AI coach.")
+
+        # Chat history
+        chat_container = st.container()
+        with chat_container:
+            for msg in st.session_state.chat_history:
+                if msg["role"] == "user":
+                    st.markdown(f'<div class="chat-bubble-user">{msg["content"]}</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div class="chat-bubble-ai">{msg["content"]}</div>', unsafe_allow_html=True)
+                    if msg.get("source"):
+                        st.markdown(f'<div class="chat-citation">📎 Source: {msg["source"]}</div>', unsafe_allow_html=True)
+
+        # Input
+        query = st.chat_input("Ask the Coach anything about your performance...")
         if query:
             st.session_state.chat_history.append({"role": "user", "content": query, "source": None})
-            
-            # Query backend
-            role_str = st.session_state.profile["focus"] if st.session_state.profile else "Sales Manager"
-            exp_str = st.session_state.profile["experience"] if st.session_state.profile else "Mid Operator"
-            
-            response = agent.ask(query, role_str, exp_str)
-            
-            st.session_state.chat_history.append({
-                "role": "ai",
-                "content": response["answer"],
-                "source": response["source"]
-            })
+            role_str = profile["focus"]
+            exp_str = profile["experience"]
+            with st.spinner("Coach is thinking..."):
+                response = agent.ask(query, role_str, exp_str)
+            st.session_state.chat_history.append({"role": "ai", "content": response["answer"], "source": response.get("source")})
             st.rerun()
-            
-    with coach_col2:
-        st.markdown("### Manage RAG Knowledge Base")
-        st.write("Upload strategy documents to index the AI Assistant:")
-        
-        # File uploader
-        uploaded_files = st.file_uploader("Upload .txt, .md, or .pdf files:", accept_multiple_files=True, type=["txt", "md", "pdf"])
-        if st.button("Index Files to RAG"):
+
+    with kb_col:
+        # Knowledge base panel
+        st.markdown('<div class="section-title">📂 Knowledge Base</div>', unsafe_allow_html=True)
+
+        uploaded_files = st.file_uploader(
+            "Drop SOP / Floor Plan Transcripts",
+            accept_multiple_files=True,
+            type=["txt", "md", "pdf"],
+            help="PDF, DOCX, or TXT (max 50MB per file)"
+        )
+        if st.button("📥 Index Files", use_container_width=True):
             if uploaded_files:
-                saved_count = 0
-                for uploaded_file in uploaded_files:
-                    destination = KNOWLEDGE_BASE_DIR / uploaded_file.name
-                    with open(destination, "wb") as f:
-                        f.write(uploaded_file.getbuffer())
-                    saved_count += 1
-                
-                st.success(f"Indexed {saved_count} file(s) successfully!")
-                # Re-index RAG
+                for f in uploaded_files:
+                    dest = KNOWLEDGE_BASE_DIR / f.name
+                    with open(dest, "wb") as fh:
+                        fh.write(f.getbuffer())
+                st.success(f"Indexed {len(uploaded_files)} file(s)!")
                 agent._setup_retriever()
                 st.rerun()
             else:
-                st.error("Select files first.")
-                
-        # Index listing
-        st.write("---")
-        st.write("**Indexed Files:**")
-        files = sorted([f.name for f in KNOWLEDGE_BASE_DIR.iterdir() if f.is_file() and f.suffix.lower() in [".txt", ".md", ".pdf"]])
+                st.error("Select at least one file.")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Active content
+        st.markdown('<div class="section-title">Active Content</div>', unsafe_allow_html=True)
+        files = sorted([f for f in KNOWLEDGE_BASE_DIR.iterdir() if f.is_file() and f.suffix.lower() in [".txt", ".md", ".pdf"]])
         if files:
             for f in files:
-                st.markdown(f"- 📄 {f}")
+                icon = "📄" if f.suffix == ".txt" else ("📋" if f.suffix == ".md" else "📕")
+                size_kb = f.stat().st_size // 1024
+                st.markdown(f"""
+                <div class="sop-card">
+                    <div class="sop-icon">{icon}</div>
+                    <div>
+                        <div class="sop-name">{f.name}</div>
+                        <div class="sop-meta">{size_kb} KB · Indexed</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
         else:
-            st.caption("No files indexed yet.")
+            st.caption("No files indexed yet. Upload above to enable RAG grounding.")
+
+        # Quick insights
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Quick Insights</div>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div style="display:flex; gap:1rem; margin-bottom:0.75rem;">
+            <div style="background:#f0faf4; border-radius:8px; padding:0.6rem 0.85rem; flex:1;">
+                <div style="font-size:0.68rem; color:#5d8a72; text-transform:uppercase;">Conv. Rate</div>
+                <div style="font-weight:700; font-size:1.1rem; color:#0d2418;">18.4%</div>
+            </div>
+            <div style="background:#f0faf4; border-radius:8px; padding:0.6rem 0.85rem; flex:1;">
+                <div style="font-size:0.68rem; color:#5d8a72; text-transform:uppercase;">Avg Deal</div>
+                <div style="font-weight:700; font-size:1.1rem; color:#0d2418;">2.4m</div>
+            </div>
+        </div>
+        <div style="background:#0d3d2e; border-radius:10px; padding:0.85rem; color:#d4f0e6; font-size:0.78rem;">
+            <div style="font-weight:700; margin-bottom:0.3rem;">⚡ CoachMode: Aggressive</div>
+            Focusing on high-velocity closing techniques for current pipeline stage.
+        </div>
+        """, unsafe_allow_html=True)
 
 
-# --- TAB 4: SOP KNOWLEDGE BASE ---
-with tab4:
-    st.subheader("SOP Knowledge Base & NotebookLM Simulator")
-    
-    sop_col1, sop_col2 = st.columns([1.5, 1])
-    
-    with sop_col1:
-        st.write("Select a Standard Operating Procedure (SOP) to review:")
-        sop_choice = st.selectbox("Active SOPs:", ["SOP: Lead Handling & Routing", "SOP: Listing Launch Checklist", "SOP: Commission Dispute Resolution"])
-        
-        if sop_choice == "SOP: Lead Handling & Routing":
-            st.markdown("""
-            ### SOP: Lead Handling & Routing (Revision 4.1)
-            
-            #### 1. Lead Response Time SLA
-            All inbound web inquiries (Zillow, Realtor.com, personal website landing pages) must be contacted within **15 minutes** of registration during normal business hours (8:00 AM - 7:00 PM). P1-level "Hot Leads" must be called immediately.
-            
-            #### 2. CRM Logging Protocol
-            Every lead contact attempt must be logged in the database CRM under the following guidelines:
-            - Record date and time of attempt.
-            - Log outcome code (e.g. NA for No Answer, VM for Voicemail, CC for Connected).
-            - Schedule follow-up task sequence before closing contact pane.
-            
-            #### 3. Active Lead Routing Hierarchy
-            If an assigned agent fails to contact a client within 2 hours, the lead is automatically reassigned to the secondary on-call listing agent to prevent response time degradation. Dispute claims regarding lead stealing will be routed to the Regional Sales Manager.
-            """)
-        elif sop_choice == "SOP: Listing Launch Checklist":
-            st.markdown("""
-            ### SOP: Listing Launch Checklist (Revision 2.0)
-            
-            #### 1. Marketing Preparations (Day -7 to Day -1)
-            Standard listing onboarding workflow checklist:
-            1. Schedule HDR photography and 3D walkthrough scanning (must complete by Day -4).
-            2. Acquire and verify listing title deed and survey documents.
-            3. Draft MLS property description using standard approved formatting rules.
-            
-            #### 2. Go-Live Procedures (Day 0)
-            Listing goes live on MLS by 9:00 AM EST on Thursday. Submit syndication feeds to Zillow, Trulia, and Realtor.com. Install yard signs, lockbox, and flyer cabinets at the property.
-            
-            #### 3. Post-Launch Actions (Day +1 to Day +3)
-            Schedule public Open House for Saturday and Sunday (1:00 PM - 4:00 PM). Launch targeted social media marketing campaigns (minimum budget $100 per listing).
-            """)
-        else:
-            st.markdown("""
-            ### SOP: Commission Dispute Resolution (Revision 1.2)
-            
-            #### 1. Definition of Procuring Cause
-            Disputes regarding split commissions are governed by the principle of "Procuring Cause"—the agent who initiated the chain of events that directly led to the final contract signing is entitled to the primary split.
-            
-            #### 2. Informal Review Process
-            Prior to submitting a formal broker dispute, agents must attempt an informal mutual review with the sales manager. The manager acts as a neutral negotiator to establish splitting terms (e.g. 50/50, 75/25 split arrangements).
-            
-            #### 3. Formal Arbitration Workflow
-            If informal review fails, agents must submit a formal written request for arbitration within 10 business days of contract closing. The executive review board will render a final, non-appealable decision within 5 business days of submission.
-            """)
-            
-    with sop_col2:
-        st.markdown("### NotebookLM Simulator")
-        st.caption("Grounded in Active SOPs")
-        
-        # Render NotebookLM Chat
-        for msg in st.session_state.nb_chat_history:
-            with st.chat_message(msg["role"]):
-                st.write(msg["content"])
-                if msg.get("citations"):
-                    st.caption(f"Citations: {', '.join(msg['citations'])}")
-                    
-        # Suggestions buttons
-        st.write("Suggested Queries:")
-        col_s1, col_s2 = st.columns(2)
-        with col_s1:
-            q1 = st.button("What is lead SLA limit?")
-        with col_s2:
-            q2 = st.button("First 24h listing steps?")
-            
-        nb_query = st.text_input("Ask NotebookLM Simulator:")
-        
-        if q1: nb_query = "What is the response time limit for a hot web lead?"
-        if q2: nb_query = "What are the marketing steps for the first 24 hours of a listing?"
-        
-        if st.button("Query NotebookLM") or nb_query:
-            if nb_query:
-                st.session_state.nb_chat_history.append({"role": "user", "content": nb_query, "citations": []})
-                
-                lower = nb_query.lower()
-                answer = "I couldn't find a direct answer to that query in the active SOPs."
-                citations = []
-                
-                if "response time" in lower or "sla" in lower or "limit" in lower or "hot" in lower:
-                    answer = "According to **SOP: Lead Handling & Routing (Section 1)**, all inbound web inquiries must be contacted within **15 minutes** of registration. Hot Leads require immediate phone call response."
-                    citations = ["SOP: Lead Handling & Routing §1"]
-                elif "24 hours" in lower or "listing" in lower or "checklist" in lower or "marketing" in lower:
-                    answer = "Based on **SOP: Listing Launch Checklist (Section 2)**, within the first 24 hours of going live (Day 0), you must: 1. Confirm syndication to portals. 2. Install physical yard signs and lockboxes. 3. Setup flyer cabinets."
-                    citations = ["SOP: Listing Launch Checklist §2"]
-                elif "dispute" in lower or "claim" in lower or "split" in lower or "cause" in lower:
-                    answer = "According to **SOP: Commission Dispute Resolution (Section 2)**, agents must attempt an informal review with the manager to reach a split agreement (e.g. 50/50). If unresolved, they must submit written arbitration request within 10 days."
-                    citations = ["SOP: Commission Dispute Resolution §2"]
-                    
-                st.session_state.nb_chat_history.append({
-                    "role": "ai",
-                    "content": answer,
-                    "citations": citations
-                })
+# ============================================================
+# PAGE 4 — SOPs KNOWLEDGE BASE
+# ============================================================
+elif page == "SOPs":
+    st.markdown("""
+    <div class="page-header">
+        <h1>SOPs Library</h1>
+        <p>Knowledge base, document indexing, and library health</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    upload_col, health_col = st.columns([1.5, 1])
+
+    with upload_col:
+        st.markdown('<div class="section-title">📤 Knowledge Base Uploader</div>', unsafe_allow_html=True)
+        st.markdown("""
+        <div style="border:2px dashed #d0e8dc; border-radius:12px; padding:2rem; text-align:center; background:#f8fdfb; margin-bottom:1rem;">
+            <div style="font-size:2rem; margin-bottom:0.5rem;">📁</div>
+            <div style="font-weight:600; color:#0d2418; margin-bottom:0.25rem;">Drag & Drop Documents</div>
+            <div style="font-size:0.8rem; color:#9aada5;">PDF, DOCX, or TXT (max 50MB per file)</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        sop_files = st.file_uploader("Select files from computer", accept_multiple_files=True, type=["txt", "md", "pdf"], label_visibility="collapsed")
+        if st.button("📥 Select & Index Files from Computer", use_container_width=True):
+            if sop_files:
+                for f in sop_files:
+                    dest = KNOWLEDGE_BASE_DIR / f.name
+                    with open(dest, "wb") as fh:
+                        fh.write(f.getbuffer())
+                st.success(f"✅ {len(sop_files)} file(s) indexed successfully!")
                 st.rerun()
 
+        st.markdown('<br><div class="section-title">Browse Documentation</div>', unsafe_allow_html=True)
 
-# --- TAB 5: STRATEGY & PROMPTING TOOLS ---
-with tab5:
-    st.subheader("Strategy & Custom Prompt compiler")
-    
-    tool_col1, tool_col2 = st.columns(2)
-    
-    with tool_col1:
-        st.markdown("### Action, Context, Parameters (ACP) Prompting Engine")
-        st.write("Compile prompts that output clean real estate templates without generic AI filler:")
-        
-        scenario = st.selectbox("Scenario Template", ["Silent Client Follow-up", "Property Listing Description", "Commission Split Inquiry Response"])
-        
-        default_context = ""
-        default_params = ""
-        
-        if scenario == "Silent Client Follow-up":
-            default_context = "Buyer named Sarah Connor viewed 1045 River Rd 4 days ago. Expressed high interest in chef kitchen and quiet backyard, but has been silent on texts."
-            default_params = "Role: Senior Consultative Real Estate Advisor.\nTone: Warm, professional, low-pressure.\nConstraints: Max 120 words. No corporate jargon. Ask a single open-ended question about disclosures."
-        elif scenario == "Property Listing Description":
-            default_context = "Listing: 789 Oakridge Ave. 4 beds, 3.5 baths, modern style. Solar panels offset utility cost, concrete counters, native landscaping."
-            default_params = "Role: Expert sustainable copywriter.\nTone: Eco-conscious, architectural.\nConstraints: Limit to 3 short paragraphs. Include utility offset bullet points."
-        else:
-            default_context = "Agent Kyle requests 5% bump in split override for Valley View transaction ($1.8M sales price) claiming self-sourced buyer and spent $2k on custom brochures."
-            default_params = "Role: Brokerage Sales Manager.\nTone: Firm but empathetic.\nConstraints: Decline request. Remind of Section 4.2 Uniform Split policy. Detail Tier Volume pathway."
-            
-        context_input = st.text_area("Context / Raw details:", value=default_context)
-        params_input = st.text_area("Parameters (Tone, Length, Constraints):", value=default_params)
-        
-        if st.button("Compile ACP Prompt"):
-            compiled_prompt = f"""[ROLE & PERSONA]
-You are a Real Estate Strategy Expert. Adopt a professional, direct, and outcome-oriented communication style.
+        # Built-in SOPs
+        builtin_sops = [
+            ("📘", "Luxury Client Onboarding v2.4", "Operations", "Oct 24, 2023", "Indexed"),
+            ("📊", "Market Analysis: Q3 Seattle Residential", "Strategy", "Oct 21, 2023", "Indexed"),
+            ("📞", "Cold Calling Script: Rejection Handling", "Training", "Oct 18, 2023", "Processing"),
+            ("⚖️", "Broker Compliance Checklist 2024", "Legal", "Oct 15, 2023", "Indexed"),
+        ]
+        cat_colors = {"Operations": "#dbeafe", "Strategy": "#d4f0e6", "Training": "#fef3c7", "Legal": "#fde8e8"}
+        cat_text = {"Operations": "#1e40af", "Strategy": "#0d5f35", "Training": "#92400e", "Legal": "#9b1c1c"}
+
+        for icon, name, cat, date, status in builtin_sops:
+            cat_bg = cat_colors.get(cat, "#f0f4f2")
+            cat_fg = cat_text.get(cat, "#374151")
+            status_color = "#1a8f5f" if status == "Indexed" else "#e38a1a"
+            st.markdown(f"""
+            <div style="display:flex; align-items:center; justify-content:space-between; background:#ffffff; border:1px solid #e8eef0; border-radius:8px; padding:0.75rem 1rem; margin-bottom:0.5rem;">
+                <div style="display:flex; align-items:center; gap:0.75rem;">
+                    <span style="font-size:1.2rem;">{icon}</span>
+                    <div>
+                        <div style="font-weight:600; font-size:0.875rem; color:#0d2418;">{name}</div>
+                        <div style="font-size:0.72rem; color:#9aada5;">Last Updated: {date}</div>
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:0.75rem;">
+                    <span style="background:{cat_bg}; color:{cat_fg}; font-size:0.68rem; font-weight:700; padding:2px 8px; border-radius:4px;">{cat}</span>
+                    <span style="color:{status_color}; font-size:0.75rem; font-weight:600;">● {status}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Uploaded files too
+        uploaded_kb = [f for f in KNOWLEDGE_BASE_DIR.iterdir() if f.is_file() and f.suffix.lower() in [".txt", ".md", ".pdf"]]
+        for f in uploaded_kb:
+            st.markdown(f"""
+            <div style="display:flex; align-items:center; justify-content:space-between; background:#ffffff; border:1px solid #e8eef0; border-radius:8px; padding:0.75rem 1rem; margin-bottom:0.5rem;">
+                <div style="display:flex; align-items:center; gap:0.75rem;">
+                    <span style="font-size:1.2rem;">📄</span>
+                    <div>
+                        <div style="font-weight:600; font-size:0.875rem; color:#0d2418;">{f.name}</div>
+                        <div style="font-size:0.72rem; color:#9aada5;">{f.stat().st_size // 1024} KB</div>
+                    </div>
+                </div>
+                <span style="color:#1a8f5f; font-size:0.75rem; font-weight:600;">● Indexed</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+    with health_col:
+        st.markdown('<div class="section-title">🏥 Library Health</div>', unsafe_allow_html=True)
+        st.markdown("""
+        <div style="background:#ffffff; border:1px solid #e8eef0; border-radius:10px; padding:1rem; margin-bottom:0.75rem;">
+            <div style="font-size:0.75rem; color:#9aada5; margin-bottom:0.25rem;">RAG Readiness</div>
+            <div style="font-size:2rem; font-weight:700; color:#1a8f5f;">92%</div>
+        </div>
+        <div style="background:#f0faf4; border-radius:10px; padding:1rem; margin-bottom:0.75rem; font-size:0.8rem; color:#2d6048;">
+            <div style="font-weight:700; margin-bottom:0.35rem;">128 Documents indexed</div>
+            Real-time AI context retrieval active
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("""
+        <div style="background:#0d3d2e; border-radius:10px; padding:1rem; color:#d4f0e6; margin-bottom:1rem;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                    <div style="font-weight:700; font-size:0.875rem; margin-bottom:0.25rem;">⚡ Smart-Tagging Active</div>
+                    <div style="font-size:0.75rem; color:#7db89a;">Documents are automatically categorised using GPT-4o analysis.</div>
+                </div>
+                <span style="background:#1a8f5f; color:white; font-size:0.65rem; font-weight:700; padding:2px 6px; border-radius:4px;">PRO</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Storage stats
+        file_count = len(list(KNOWLEDGE_BASE_DIR.iterdir()))
+        st.markdown(f"""
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; text-align:center;">
+            <div style="background:#ffffff; border:1px solid #e8eef0; border-radius:8px; padding:0.6rem;">
+                <div style="font-size:1rem; font-weight:700; color:#0d2418;">2.4 GB</div>
+                <div style="font-size:0.65rem; color:#9aada5;">Total Storage</div>
+            </div>
+            <div style="background:#ffffff; border:1px solid #e8eef0; border-radius:8px; padding:0.6rem;">
+                <div style="font-size:1rem; font-weight:700; color:#0d2418;">12</div>
+                <div style="font-size:0.65rem; color:#9aada5;">Active Indices</div>
+            </div>
+            <div style="background:#ffffff; border:1px solid #e8eef0; border-radius:8px; padding:0.6rem;">
+                <div style="font-size:1rem; font-weight:700; color:#0d2418;">42</div>
+                <div style="font-size:0.65rem; color:#9aada5;">Users</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+# ============================================================
+# PAGE 5 — STRATEGY TOOLS
+# ============================================================
+elif page == "Strategy Tools":
+    st.markdown("""
+    <div class="page-header">
+        <h1>Governance Tester</h1>
+        <p>Verify AI outputs against architectural compliance standards and operational SOPs before deployment.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    gov_col, rules_col = st.columns([1.6, 1])
+
+    with gov_col:
+        st.markdown('<div class="section-title">🛡 Governance Tester</div>', unsafe_allow_html=True)
+
+        prompt_input = st.text_area(
+            "Input Agent Prompt or Response",
+            placeholder="Paste the AI-generated property description or client response here for validation...",
+            height=120
+        )
+
+        compliance_fw = st.selectbox(
+            "Target Compliance Framework",
+            ["General Real Estate Ethics v2024", "HUD Fair Housing Standards", "RESPA Compliance v3.1", "GDPR Data Handling Policy"]
+        )
+
+        if st.button("▶ Run Validation", use_container_width=False):
+            if prompt_input.strip():
+                lower = prompt_input.lower()
+                has_issue = any(w in lower for w in ["terminate", "discriminat", "personal data", "client ssn", "reject application"])
+                accuracy = "91%" if not has_issue else "64%"
+                risk = "Low" if not has_issue else "High"
+                risk_color = "#1a8f5f" if not has_issue else "#e35b5b"
+                alignment = "High" if not has_issue else "Low"
+
+                st.markdown(f"""
+                <div class="validation-box">
+                    <div style="font-weight:700; margin-bottom:0.75rem; color:#0d2418;">✅ Validation Status</div>
+                    <div style="display:flex; gap:2rem;">
+                        <div>
+                            <div style="font-size:0.68rem; text-transform:uppercase; color:#9aada5;">Accuracy</div>
+                            <div style="font-weight:700; font-size:1rem; color:#0d2418;">{accuracy}</div>
+                        </div>
+                        <div>
+                            <div style="font-size:0.68rem; text-transform:uppercase; color:#9aada5;">Risk Level</div>
+                            <div style="font-weight:700; font-size:1rem; color:{risk_color};">{risk}</div>
+                        </div>
+                        <div>
+                            <div style="font-size:0.68rem; text-transform:uppercase; color:#9aada5;">Alignment</div>
+                            <div style="font-weight:700; font-size:1rem; color:#0d2418;">{alignment}</div>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.error("Enter a prompt or response to validate.")
+
+        # ACP Prompt Engine
+        st.markdown('<br><div class="section-title">🔧 ACP Prompting Engine</div>', unsafe_allow_html=True)
+        scenario = st.selectbox("Scenario Template", ["Silent Client Follow-up", "Property Listing Description", "Commission Split Inquiry"])
+        defaults = {
+            "Silent Client Follow-up": ("Buyer Sarah Connor viewed 1045 River Rd 4 days ago. High interest in kitchen, silent on texts.", "Role: Senior Consultative Advisor. Tone: Warm, low-pressure. Max 120 words. Single open-ended question."),
+            "Property Listing Description": ("789 Oakridge Ave. 4 beds, 3.5 baths, solar panels, concrete counters.", "Role: Expert sustainable copywriter. Eco-conscious tone. 3 paragraphs max."),
+            "Commission Split Inquiry": ("Agent Kyle requests 5% bump in split for Valley View ($1.8M). Self-sourced buyer, spent $2k on brochures.", "Role: Brokerage Sales Manager. Firm but empathetic. Decline. Reference Section 4.2."),
+        }
+        ctx, params = defaults[scenario]
+        context_input = st.text_area("Context / Raw details:", value=ctx, height=80)
+        params_input = st.text_area("Parameters (Tone, Length, Constraints):", value=params, height=80)
+
+        if st.button("⚡ Compile ACP Prompt", use_container_width=False):
+            compiled = f"""[ROLE & PERSONA]
+You are a Real Estate Strategy Expert — professional, direct, outcome-oriented.
 
 [TASK ACTION]
-Generate a response appropriate for the following scenario: {scenario}.
+Generate a response for: {scenario}
 
-[CONTEXT & RAW DATA]
+[CONTEXT]
 {context_input}
 
-[CONSTRAINTS & PARAMETERS]
+[CONSTRAINTS]
 {params_input}
 
-[EXECUTION RULESET]
-1. Write the final response draft directly.
-2. Ensure you strictly adhere to the negative constraints (no buzzwords, max length, tone).
-3. Do not include introductory text like "Sure, here is the email:" or placeholder symbols."""
-            
-            st.code(compiled_prompt, language="markdown")
-            st.success("ACP Prompt Compiled! Copy the block above into ChatGPT, Gemini, or Claude.")
-            
-    with tool_col2:
-        st.markdown("### 5W1H Reporting Tool (Who, What, Where, When, Why, How)")
-        st.write("Summarize noisy meeting transcripts or CRM logs into high-density actionable checklists:")
-        
-        report_src = st.selectbox("Report Source Data:", ["Weekly Pipeline Review Sync (Transcript)", "Active Escrow Pipeline (CRM Export)"])
-        
-        raw_text = ""
-        if report_src == "Weekly Pipeline Review Sync (Transcript)":
-            raw_text = """Manager: Let's do a fast alignment. Dave, what is the status of the listing at 412 Hillside?
-Dave: The seller is willing to drop the price by $15,000 if we don't get offers by Wednesday night. I'm hosting an broker open house on Tuesday morning between 10 AM and 12 PM to drum up agent interest.
-Manager: Okay, write up the MLS adjustment draft today so we can push it live Wednesday at 9 AM if needed. Sarah, what about escrow on the 102 Pine St deal?
-Sarah: The buyers are objecting to the roof inspection report. They want a $5,000 credit or they threat to terminate. We have until Friday at 5 PM to submit our response amendment to Escrow.
-Manager: Write a counter-amendment offering a $2,500 credit and coordinate with listing contractors for an independent quote by Thursday morning."""
-        else:
-            raw_text = """- RECORD ID: #ESC-9011 | Agent: Dave | Listing: 233 Broad St | Status: Awaiting Loan Commitment | Deadline: June 25, 5:00 PM | Action: Upload buyer pre-approval verification document.
-- RECORD ID: #ESC-8922 | Agent: Sarah | Listing: 1045 River Rd | Phase: Attorney Review | Status: Sewer line easement dispute | Deadline: June 29, 12:00 PM | Action: Coordinate escrow disclosure review with legal team.
-- RECORD ID: #ESC-9055 | Agent: Marcus | Listing: 890 Ridge Way | Status: Lead Response Lagging | Total Leads: 12 | Call rate: 25% | Action: Trigger auto-reminder templates to Marcus."""
+[RULES]
+1. Write the final response directly — no meta-commentary.
+2. Strictly respect the constraints (length, tone, no buzzwords).
+3. Do not use phrases like "Sure, here is the email:"."""
+            st.code(compiled, language="markdown")
+            st.success("✅ ACP Prompt compiled! Copy into Gemini, ChatGPT, or Claude.")
 
-        st.text_area("Raw Text Preview:", value=raw_text, height=120, disabled=True)
-        
-        if st.button("Generate 5W1H Structured Digest"):
-            if report_src == "Weekly Pipeline Review Sync (Transcript)":
+        # 5W1H Tool
+        st.markdown('<br><div class="section-title">📋 5W1H Reporting Tool</div>', unsafe_allow_html=True)
+        report_src = st.selectbox("Report Source", ["Weekly Pipeline Review Sync (Transcript)", "Active Escrow Pipeline (CRM Export)"])
+        raw = "Manager: Dave, status on 412 Hillside? Dave: Seller drops $15k if no offers by Wednesday. Broker open house Tuesday 10-12. Manager: Push MLS update Wednesday 9AM." if "Transcript" in report_src else "ESC-9011 | Dave | 233 Broad St | Loan Commitment Due Jun 25 | Upload pre-approval doc."
+        st.text_area("Raw Preview:", value=raw, height=80, disabled=True)
+        if st.button("📊 Generate 5W1H Digest", use_container_width=False):
+            if "Transcript" in report_src:
                 st.markdown("""
-                #### 5W1H Structured Digest
-                
-                - **Who (Stakeholders):** Manager, Dave (Listing Agent), Sarah (Transaction Agent).
-                - **What (Issues & Actions):** 412 Hillside price reduction preparation. 102 Pine St inspections roofing dispute ($5k buyer credit demand vs $2.5k target offer).
-                - **Where (Locations):** 412 Hillside, 102 Pine St.
-                - **When (Deadlines):** Open House: Tuesday 10-12 PM. Price reduction MLS live: Wednesday 9:00 AM. Contractor quote: Thursday Morning. Escrow Response Amendment: Friday 5:00 PM.
-                - **Why (Rationales):** Drive agent interest to avoid listings staleness. Keep Pine St escrow from contract termination.
-                - **How (Methodologies):** Draft price drop on MLS; construct counter-amendment offering $2,500 credit rather than $5,000.
+**5W1H Structured Digest**
+- **Who:** Manager, Dave, Sarah
+- **What:** 412 Hillside price drop prep; 102 Pine St roof inspection credit dispute
+- **Where:** 412 Hillside St, 102 Pine St
+- **When:** Open House: Tuesday 10–12PM; MLS: Wednesday 9AM; Escrow: Friday 5PM
+- **Why:** Prevent listing staleness; keep Pine St escrow from terminating
+- **How:** Draft MLS price reduction; counter-offer $2,500 credit vs $5,000 demand
                 """)
             else:
                 st.markdown("""
-                #### 5W1H Structured Digest
-                
-                - **Who (Stakeholders):** Dave, Sarah, Marcus (Owner Agents).
-                - **What (Issues & Actions):** ESC-9011: Loan pre-approval document upload. ESC-8922: Sewer line easement review. ESC-9055: Trigger agent reminders for lagging follow-up.
-                - **Where (Locations):** 233 Broad St, 1045 River Rd, 890 Ridge Way.
-                - **When (Deadlines):** ESC-9011: June 25, 5:00 PM. ESC-8922: June 29, 12:00 PM. ESC-9055: Immediate.
-                - **Why (Rationales):** Avoid contract defaults in escrow. Mitigate sewer easement liability. Arrest lead conversion rate decay.
-                - **How (Methodologies):** Upload loan verification docs, route legal boundary files to counsel, fire auto-email triggers to agent.
+**5W1H Structured Digest**
+- **Who:** Dave, Sarah, Marcus
+- **What:** Loan doc upload; easement dispute; agent reminder trigger
+- **Where:** 233 Broad St, 1045 River Rd, 890 Ridge Way
+- **When:** ESC-9011: Jun 25 5PM; ESC-8922: Jun 29 12PM; ESC-9055: Immediate
+- **Why:** Avoid contract defaults; resolve easement liability; arrest lead decay
+- **How:** Upload verification docs; legal review; auto-email trigger to Marcus
                 """)
+
+    with rules_col:
+        st.markdown('<div class="section-title">📏 Active Rules</div>', unsafe_allow_html=True)
+        rules = [
+            ("🌐", "No Discriminatory Language", "Ensures compliance with global fair housing laws."),
+            ("🎙", "Premium Brand Voice", 'Maintains "Architectural Light" aesthetic in tone.'),
+            ("🔒", "Privacy Masking", "Auto-detects and masks PII in public responses."),
+        ]
+        for icon, title, desc in rules:
+            st.markdown(f"""
+            <div style="display:flex; gap:0.75rem; background:#ffffff; border:1px solid #e8eef0; border-radius:8px; padding:0.75rem; margin-bottom:0.5rem; align-items:flex-start;">
+                <span style="font-size:1.1rem;">{icon}</span>
+                <div>
+                    <div style="font-weight:600; font-size:0.825rem; color:#0d2418;">{title}</div>
+                    <div style="font-size:0.72rem; color:#9aada5; margin-top:0.2rem;">{desc}</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        if st.button("+ Add Custom Governance Rule", use_container_width=True):
+            st.info("Custom rule builder coming soon.")
+
+        st.markdown("""
+        <div style="background:#0d3d2e; border-radius:10px; padding:1rem; color:#d4f0e6; margin-top:1rem; font-size:0.8rem;">
+            <div style="font-weight:700; margin-bottom:0.35rem;">⚡ Strategy Intelligence</div>
+            Your governance score has improved by 12% since last month. Recommend updating SOP v2.1 for latest market regulations.
+            <div style="margin-top:0.75rem;">
+        """, unsafe_allow_html=True)
+        if st.button("VIEW FULL AUDIT →", use_container_width=True):
+            st.info("Full audit report export coming soon.")
+        st.markdown("</div></div>", unsafe_allow_html=True)
+
+        # Explore advanced tools
+        st.markdown('<br><div class="section-title">Explore Advanced Tools</div>', unsafe_allow_html=True)
+        adv_tools = [
+            ("🤖", "Agent Persona Crafter", "Tune the empathy and expertise parameters of your sales AI agents."),
+            ("💬", "Social Proof Verifier", "Cross-reference client testimonials with verified transaction data."),
+            ("📉", "Leakage Auditor", "Identify where in the sales funnel AI responses lose momentum."),
+        ]
+        for icon, title, desc in adv_tools:
+            st.markdown(f"""
+            <div class="tool-card">
+                <div style="font-size:1.3rem; margin-bottom:0.4rem;">{icon}</div>
+                <h4>{title}</h4>
+                <p>{desc}</p>
+            </div>
+            """, unsafe_allow_html=True)
