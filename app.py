@@ -585,137 +585,130 @@ profile = st.session_state.profile
 # PAGE 1 — DASHBOARD OVERVIEW
 # ============================================================
 if page == "Dashboard":
+    deals = st.session_state.deals
+
+    # --- Compute real metrics from pipeline data ---
+    total_deals   = len(deals)
+    leads         = [d for d in deals if d["stage"] == "Lead"]
+    discovery     = [d for d in deals if d["stage"] == "Discovery"]
+    proposals     = [d for d in deals if d["stage"] == "Proposal"]
+    closed        = [d for d in deals if d["stage"] == "Closed Won"]
+    active_deals  = leads + discovery + proposals
+    win_rate      = round(len(closed) / total_deals * 100) if total_deals else 0
+
     st.markdown(f"""
     <div class="page-header">
-        <h1>Intelligence Dashboard</h1>
-        <p>Operational efficiency and strategic growth markers · {profile['focus']}</p>
+        <h1>Dashboard</h1>
+        <p>Welcome back, {profile['name']} · {profile['focus']}</p>
     </div>
     """, unsafe_allow_html=True)
 
-    # Top metric row
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown("""
+    # ── Row 1: 4 clear KPI cards ──────────────────────────────
+    k1, k2, k3, k4 = st.columns(4)
+    with k1:
+        st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">⏱ Time Waste</div>
-            <div class="metric-value red">12.4 hrs</div>
-            <div class="metric-sub">/ week · Manual operational redundancies</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col2:
-        st.markdown("""
+            <div class="metric-label">📋 Total Active Deals</div>
+            <div class="metric-value teal">{len(active_deals)}</div>
+            <div class="metric-sub">Leads, Discovery & Proposals</div>
+        </div>""", unsafe_allow_html=True)
+    with k2:
+        st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">🎯 Operational Focus</div>
-            <div class="metric-value teal">86%</div>
-            <div class="metric-sub">+2% · Strategic client interaction vs. admin tasks</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col3:
-        st.markdown("""
+            <div class="metric-label">🤝 Proposals Out</div>
+            <div class="metric-value blue">{len(proposals)}</div>
+            <div class="metric-sub">Awaiting client decision</div>
+        </div>""", unsafe_allow_html=True)
+    with k3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">✅ Closed Won</div>
+            <div class="metric-value teal">{len(closed)}</div>
+            <div class="metric-sub">Completed this cycle</div>
+        </div>""", unsafe_allow_html=True)
+    with k4:
+        st.markdown(f"""
         <div class="metric-card" style="background:#0d3d2e; border-color:#1a8f5f;">
-            <div class="metric-label" style="color:#7db89a;">⚡ AI Target State Goal</div>
-            <div class="metric-value" style="color:#ffffff;">95%</div>
-            <div class="metric-sub" style="color:#7db89a;">Q4 Projection · Automation saturation goal</div>
-        </div>
-        """, unsafe_allow_html=True)
+            <div class="metric-label" style="color:#7db89a;">🎯 Win Rate</div>
+            <div class="metric-value" style="color:#ffffff;">{win_rate}%</div>
+            <div class="metric-sub" style="color:#7db89a;">Closed vs. total deals</div>
+        </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    left_col, right_col = st.columns([1.4, 1])
+    # ── Row 2: Pipeline by stage + Deals needing action ──────
+    left_col, right_col = st.columns([1.3, 1])
 
     with left_col:
-        # Time Leak Calculator
-        st.markdown('<div class="section-title">⏳ Time Leak Calculator</div>', unsafe_allow_html=True)
-        st.markdown("""
-        <div class="metric-card">
-            <p style="color:#7a8f85; font-size:0.85rem; margin:0 0 1rem 0;">Quantify the financial impact of manual operational leaks within your sales pipeline.</p>
-        """, unsafe_allow_html=True)
+        st.markdown('<div class="section-title">📊 Pipeline by Stage</div>', unsafe_allow_html=True)
 
-        hours_admin = st.slider("Weekly hours on admin tasks", 0, 40, 14)
-        avg_commission = st.number_input("Avg. Commission Value ($)", value=12500, step=500)
-        revenue_lost = int((hours_admin / 40) * avg_commission * 4)
+        stage_data = [
+            ("Lead",       len(leads),     "#38bdf8", "New contacts not yet qualified"),
+            ("Discovery",  len(discovery), "#f59e0b", "Actively gathering client requirements"),
+            ("Proposal",   len(proposals), "#1a8f5f", "Offer or listing agreement sent"),
+            ("Closed Won", len(closed),    "#6366f1", "Deal completed successfully"),
+        ]
+        max_count = max(count for _, count, _, _ in stage_data) or 1
 
-        st.markdown(f"""
-        <div style="display:flex; gap:1.5rem; margin-top:0.75rem;">
-            <div><div style="font-size:0.7rem; color:#9aada5; text-transform:uppercase;">Weekly hrs on Admin</div><div style="font-size:1.5rem; font-weight:700; color:#e35b5b;">{hours_admin}h</div></div>
-            <div><div style="font-size:0.7rem; color:#9aada5; text-transform:uppercase;">Annual Revenue Loss</div><div style="font-size:1.5rem; font-weight:700; color:#0d2418;">${revenue_lost:,}</div></div>
-        </div>
-        <div style="margin-top:1rem;">
-        """, unsafe_allow_html=True)
-
-        if st.button("📊 Plug the Leak →", key="plug_leak"):
-            st.success("RealtyAI typically recovers 65% of this lost time within the first 3 months. Check the Strategy Tools tab to get started.")
-        st.markdown("</div></div>", unsafe_allow_html=True)
-
-        # High-priority pipeline
-        st.markdown('<br><div class="section-title">📋 High-Priority Pipeline</div>', unsafe_allow_html=True)
-        top_deals = [d for d in st.session_state.deals if d["stage"] in ["Proposal", "Discovery"]]
-        if top_deals:
-            for d in top_deals[:3]:
-                confidence = "92%" if d["stage"] == "Proposal" else "76%"
-                conf_color = "#1a8f5f" if d["stage"] == "Proposal" else "#e38a1a"
-                st.markdown(f"""
-                <div style="display:flex; justify-content:space-between; align-items:center; background:#ffffff; border:1px solid #e8eef0; border-radius:8px; padding:0.65rem 1rem; margin-bottom:0.5rem;">
+        for stage, count, color, desc in stage_data:
+            bar_pct = int(count / max_count * 100)
+            st.markdown(f"""
+            <div style="background:#ffffff; border:1px solid #e8eef0; border-radius:10px; padding:0.85rem 1.1rem; margin-bottom:0.6rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
                     <div>
-                        <div style="font-weight:600; font-size:0.875rem; color:#0d2418;">{d['accountName']} — {d['propertyAddress']}</div>
-                        <div style="font-size:0.72rem; color:#9aada5;">{d['type']} · {d['stage']}</div>
+                        <span style="font-weight:700; font-size:0.9rem; color:#0d2418;">{stage}</span>
+                        <span style="font-size:0.75rem; color:#9aada5; margin-left:0.5rem;">{desc}</span>
                     </div>
-                    <div style="text-align:right;">
-                        <div style="font-size:0.8rem; font-weight:700; color:{conf_color};">AI Confidence {confidence}</div>
-                        <div style="font-size:0.7rem; color:#9aada5;">{d['dealValue']}</div>
-                    </div>
+                    <span style="font-weight:800; font-size:1.1rem; color:{color};">{count}</span>
                 </div>
-                """, unsafe_allow_html=True)
+                <div style="background:#f0f4f2; border-radius:4px; height:6px;">
+                    <div style="background:{color}; border-radius:4px; height:6px; width:{bar_pct}%; transition:width 0.3s;"></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Add new deal shortcut
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("➕ Add New Deal", use_container_width=True, key="dash_add_deal"):
+            st.session_state.active_page = "Pipeline"
+            st.rerun()
 
     with right_col:
-        # Live feed
-        st.markdown('<div class="section-title">📡 Live Feed</div>', unsafe_allow_html=True)
-        feed_items = [
-            ("🤖 Automation Deployed", "Property Matching Module • 6h ago"),
-            ("💡 Insight Generated", "Pipeline Velocity Alert · Listings"),
-            ("📄 Report Prepared", "Weekly Growth Summary · 8 Apr"),
-        ]
-        for title, sub in feed_items:
-            st.markdown(f"""
-            <div class="feed-item">
-                <strong>{title}</strong><br>{sub}
-            </div>
-            """, unsafe_allow_html=True)
+        st.markdown('<div class="section-title">🔔 Deals Needing Attention</div>', unsafe_allow_html=True)
+
+        attention_deals = [d for d in deals if d["stage"] in ["Lead", "Discovery", "Proposal"]]
+        if attention_deals:
+            for d in attention_deals[:4]:
+                stage_colors = {"Lead": "#38bdf8", "Discovery": "#f59e0b", "Proposal": "#1a8f5f"}
+                s_color = stage_colors.get(d["stage"], "#9aada5")
+                st.markdown(f"""
+                <div style="background:#ffffff; border:1px solid #e8eef0; border-left:3px solid {s_color}; border-radius:8px; padding:0.75rem 1rem; margin-bottom:0.55rem;">
+                    <div style="font-weight:600; font-size:0.875rem; color:#0d2418;">{d['accountName']}</div>
+                    <div style="font-size:0.75rem; color:#7a8f85; margin:0.15rem 0;">{d['propertyAddress']} · <strong style="color:{s_color};">{d['stage']}</strong></div>
+                    <div style="font-size:0.72rem; color:#9aada5;">Next: {d.get('tag', d.get('nextStep','—'))}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No active deals yet. Add some in the Pipeline tab.")
 
         st.markdown("<br>", unsafe_allow_html=True)
-        # Governance guardrails
-        st.markdown('<div class="section-title">🛡 AI Guardrails</div>', unsafe_allow_html=True)
-        guard_mode = st.radio("Mode", ["Policy Viewer", "Scenario Tester"], horizontal=True, label_visibility="collapsed")
+        st.markdown('<div class="section-title">⚡ Quick Actions</div>', unsafe_allow_html=True)
+        qa1, qa2 = st.columns(2)
+        with qa1:
+            if st.button("💬 Ask AI Coach", use_container_width=True, key="dash_coach"):
+                st.session_state.active_page = "AI Coach"
+                st.rerun()
+            if st.button("📚 Browse SOPs", use_container_width=True, key="dash_sops"):
+                st.session_state.active_page = "SOPs"
+                st.rerun()
+        with qa2:
+            if st.button("📋 View Pipeline", use_container_width=True, key="dash_pipe"):
+                st.session_state.active_page = "Pipeline"
+                st.rerun()
+            if st.button("🛠 Strategy Tools", use_container_width=True, key="dash_tools"):
+                st.session_state.active_page = "Strategy Tools"
+                st.rerun()
 
-        if guard_mode == "Policy Viewer":
-            st.markdown("""
-            <div style="background:#f0faf4; border:1px solid #a7d7be; border-radius:8px; padding:0.75rem; margin-bottom:0.5rem; font-size:0.8rem;">
-                <strong style="color:#0d5f35;">🟢 Green Light (AI Approved)</strong><br>
-                <ul style="margin:0.4rem 0 0 1rem; color:#2d6048;">
-                    <li>Draft property follow-ups & listing copy</li>
-                    <li>Meeting summaries & CRM extractions</li>
-                </ul>
-            </div>
-            <div style="background:#fff5f5; border:1px solid #f5c6c6; border-radius:8px; padding:0.75rem; font-size:0.8rem;">
-                <strong style="color:#9b1c1c;">🔴 Red Light (Human-Only)</strong><br>
-                <ul style="margin:0.4rem 0 0 1rem; color:#7f1d1d;">
-                    <li>Closing high-value negotiations</li>
-                    <li>Legal contract reviews & terminations</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            test_query = st.text_input("Enter task scenario:", placeholder="Draft listing description from features")
-            if st.button("Evaluate"):
-                lower = test_query.lower()
-                red = ["terminate", "fire", "negotiate", "dispute", "lawsuit", "contract review", "commission split"]
-                green = ["draft", "summary", "listing", "email", "crm", "description", "transcript"]
-                if any(k in lower for k in red):
-                    st.error("🔴 **RED LIGHT** — Human-Only Mandated. Do not automate.")
-                elif any(k in lower for k in green):
-                    st.success("🟢 **GREEN LIGHT** — AI Approved. Safe to deploy templates.")
-                else:
-                    st.warning("🟡 **YELLOW LIGHT** — Manual review required before proceeding.")
 
 
 # ============================================================
