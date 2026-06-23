@@ -587,7 +587,29 @@ profile = st.session_state.profile
 if page == "Dashboard":
     deals = st.session_state.deals
 
-    # --- Compute real metrics from pipeline data ---
+    # --- Computations for Dashboard metrics ---
+    def parse_deal_val(val_str):
+        if not val_str:
+            return 0.0
+        v = str(val_str).replace("$", "").replace(" ", "").upper()
+        if "M" in v:
+            try: return float(v.replace("M", "")) * 1_000_000
+            except: pass
+        if "K" in v:
+            try: return float(v.replace("K", "")) * 1_000
+            except: pass
+        try:
+            return float(v)
+        except:
+            return 0.0
+
+    def format_deal_val(val):
+        if val >= 1_000_000:
+            return f"${val / 1_000_000:.1f}M"
+        elif val >= 1_000:
+            return f"${val / 1_000:.0f}k"
+        return f"${val:.0f}"
+
     total_deals   = len(deals)
     leads         = [d for d in deals if d["stage"] == "Lead"]
     discovery     = [d for d in deals if d["stage"] == "Discovery"]
@@ -596,51 +618,70 @@ if page == "Dashboard":
     active_deals  = leads + discovery + proposals
     win_rate      = round(len(closed) / total_deals * 100) if total_deals else 0
 
+    active_val = sum(parse_deal_val(d.get("dealValue", "")) for d in active_deals)
+    closed_val = sum(parse_deal_val(d.get("dealValue", "")) for d in closed)
+
     st.markdown(f"""
     <div class="page-header">
-        <h1>Dashboard</h1>
-        <p>Welcome back, {profile['name']} · {profile['focus']}</p>
+        <h1>Dashboard Overview</h1>
+        <p>Hi {profile['name']}! Here is an easy-to-read summary of your sales pipeline. Use the left menu to navigate, or update details directly below.</p>
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Row 1: 4 clear KPI cards ──────────────────────────────
+    # ── AI Executive Copilot Summary Box ──────────────────────
+    st.markdown(f"""
+    <div style="background-color: #f0fbf7; border: 1px solid #ccece0; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem;">
+        <h4 style="margin-top: 0; color: #0d3d2e; font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem;">
+            🤖 AI Executive Summary
+        </h4>
+        <p style="margin: 0.5rem 0; color: #2d503d; font-size: 0.9rem; line-height: 1.5;">
+            Your pipeline has <strong>{len(active_deals)} active opportunities</strong> worth <strong>{format_deal_val(active_val)}</strong>. You have closed <strong>{format_deal_val(closed_val)}</strong> successfully.
+        </p>
+        <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #d8f3e5; font-size: 0.82rem; color: #2d503d; display: flex; flex-direction: column; gap: 0.4rem;">
+            <div>⚠️ <strong>Action Needed:</strong> {len(leads) + len(discovery)} early-stage deals require initial follow-ups to progress.</div>
+            <div>💡 <strong>Coach Tip:</strong> Roman Roy's proposal is at <strong>Proposal</strong> stage ({format_deal_val(parse_deal_val(proposals[0].get("dealValue")) if proposals else 0)}). Go to <strong>AI Coach</strong> to draft a custom follow-up sequence.</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Row 1: KPI Cards ──────────────────────────────────────
     k1, k2, k3, k4 = st.columns(4)
     with k1:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">📋 Total Active Deals</div>
+            <div class="metric-label">📋 Active Opportunities</div>
             <div class="metric-value teal">{len(active_deals)}</div>
             <div class="metric-sub">Leads, Discovery & Proposals</div>
         </div>""", unsafe_allow_html=True)
     with k2:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">🤝 Proposals Out</div>
-            <div class="metric-value blue">{len(proposals)}</div>
-            <div class="metric-sub">Awaiting client decision</div>
+            <div class="metric-label">💰 Active Pipeline Value</div>
+            <div class="metric-value blue">{format_deal_val(active_val)}</div>
+            <div class="metric-sub">Total potential revenue</div>
         </div>""", unsafe_allow_html=True)
     with k3:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">✅ Closed Won</div>
-            <div class="metric-value teal">{len(closed)}</div>
-            <div class="metric-sub">Completed this cycle</div>
+            <div class="metric-label">✅ Closed Won Revenue</div>
+            <div class="metric-value teal">{format_deal_val(closed_val)}</div>
+            <div class="metric-sub">Successfully won deals</div>
         </div>""", unsafe_allow_html=True)
     with k4:
         st.markdown(f"""
         <div class="metric-card" style="background:#0d3d2e; border-color:#1a8f5f;">
             <div class="metric-label" style="color:#7db89a;">🎯 Win Rate</div>
             <div class="metric-value" style="color:#ffffff;">{win_rate}%</div>
-            <div class="metric-sub" style="color:#7db89a;">Closed vs. total deals</div>
+            <div class="metric-sub" style="color:#7db89a;">Won vs. total opportunities</div>
         </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Row 2: Pipeline by stage + Deals needing action ──────
+    # ── Row 2: Columns ────────────────────────────────────────
     left_col, right_col = st.columns([1.3, 1])
 
     with left_col:
-        st.markdown('<div class="section-title">📊 Pipeline by Stage</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">📊 Deals by Stage (Workflow)</div>', unsafe_allow_html=True)
 
         stage_data = [
             ("Lead",       len(leads),     "#38bdf8", "New contacts not yet qualified"),
@@ -667,11 +708,30 @@ if page == "Dashboard":
             </div>
             """, unsafe_allow_html=True)
 
-        # Add new deal shortcut
+        # Quick Deal Stage Updater
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("➕ Add New Deal", use_container_width=True, key="dash_add_deal"):
-            st.session_state.active_page = "Pipeline"
-            st.rerun()
+        st.markdown('<div class="section-title">⚙️ Quick Deal Stage Updater</div>', unsafe_allow_html=True)
+        with st.container(border=True):
+            col_d, col_s = st.columns(2)
+            with col_d:
+                deal_names = [f"{d['accountName']} ({d['propertyAddress']})" for d in deals]
+                selected_deal_name = st.selectbox("Select Deal to Update", deal_names, index=0, key="dash_sel_deal", label_visibility="collapsed")
+            with col_s:
+                stages = ["Lead", "Discovery", "Proposal", "Closed Won"]
+                # Find matching deal
+                idx = deal_names.index(selected_deal_name)
+                matching_deal = deals[idx]
+                curr_stage = matching_deal["stage"]
+                try:
+                    curr_stage_idx = stages.index(curr_stage)
+                except ValueError:
+                    curr_stage_idx = 0
+                new_stage = st.selectbox("Move to Stage", stages, index=curr_stage_idx, key="dash_sel_stage", label_visibility="collapsed")
+                
+                if new_stage != curr_stage:
+                    matching_deal["stage"] = new_stage
+                    st.success(f"Moved {matching_deal['accountName']} to {new_stage}!")
+                    st.rerun()
 
     with right_col:
         st.markdown('<div class="section-title">🔔 Deals Needing Attention</div>', unsafe_allow_html=True)
@@ -692,7 +752,7 @@ if page == "Dashboard":
             st.info("No active deals yet. Add some in the Pipeline tab.")
 
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown('<div class="section-title">⚡ Quick Actions</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">⚡ Quick Navigation Actions</div>', unsafe_allow_html=True)
         qa1, qa2 = st.columns(2)
         with qa1:
             if st.button("💬 Ask AI Coach", use_container_width=True, key="dash_coach"):
