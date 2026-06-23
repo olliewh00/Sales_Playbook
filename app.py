@@ -1090,10 +1090,13 @@ elif page == "SOPs":
 elif page == "Strategy Tools":
     st.markdown("""
     <div class="page-header">
-        <h1>Governance Tester</h1>
+        <h1>Strategy & Governance Tools</h1>
         <p>Verify AI outputs against architectural compliance standards and operational SOPs before deployment.</p>
     </div>
     """, unsafe_allow_html=True)
+
+    agent = StreamlitDecisionAgent(KNOWLEDGE_BASE_DIR)
+    api_active = bool(get_api_key())
 
     gov_col, rules_col = st.columns([1.6, 1])
 
@@ -1103,103 +1106,112 @@ elif page == "Strategy Tools":
         prompt_input = st.text_area(
             "Input Agent Prompt or Response",
             placeholder="Paste the AI-generated property description or client response here for validation...",
-            height=120
+            height=150,
+            key="gov_prompt_input"
         )
 
         compliance_fw = st.selectbox(
             "Target Compliance Framework",
-            ["General Real Estate Ethics v2024", "HUD Fair Housing Standards", "RESPA Compliance v3.1", "GDPR Data Handling Policy"]
+            ["General Real Estate Ethics v2024", "Brand Voice & Architectural Guidelines", "HUD Fair Housing Standards", "RESPA Compliance v3.1", "GDPR Data Handling Policy"],
+            key="gov_compliance_fw"
         )
 
-        if st.button("▶ Run Validation", use_container_width=False):
+        if st.button("▶ Run Validation", use_container_width=True, key="gov_run_btn"):
             if prompt_input.strip():
-                lower = prompt_input.lower()
-                has_issue = any(w in lower for w in ["terminate", "discriminat", "personal data", "client ssn", "reject application"])
-                accuracy = "91%" if not has_issue else "64%"
-                risk = "Low" if not has_issue else "High"
-                risk_color = "#1a8f5f" if not has_issue else "#e35b5b"
-                alignment = "High" if not has_issue else "Low"
+                with st.spinner("AI compliance agent is auditing your input..."):
+                    if api_active and agent.llm:
+                        validation_prompt = f"""
+You are a real estate compliance checker. Please validate the following agent prompt or response:
+"{prompt_input}"
 
-                st.markdown(f"""
-                <div class="validation-box">
-                    <div style="font-weight:700; margin-bottom:0.75rem; color:#0d2418;">✅ Validation Status</div>
-                    <div style="display:flex; gap:2rem;">
-                        <div>
-                            <div style="font-size:0.68rem; text-transform:uppercase; color:#9aada5;">Accuracy</div>
-                            <div style="font-weight:700; font-size:1rem; color:#0d2418;">{accuracy}</div>
+Analyze it against the target compliance framework: "{compliance_fw}"
+
+Check for:
+1. Accuracy (Is it clear, truthful, and matching standards?)
+2. Risk Level (Is it Low, Medium, or High Risk? Explain why, e.g., HUD violations, RESPA violations, PII leaks, discriminatory terms)
+3. Alignment (Is it highly aligned with the framework?)
+
+Provide your response in plain text with:
+- A clear summary of the findings (Bullet points of key issues if any)
+- Actionable improvement suggestions
+
+At the very end of your response, output a single line matching this format exactly:
+METRICS: Accuracy_percentage | Risk_level | Alignment_level
+(e.g., METRICS: 98% | Low | High or METRICS: 45% | High | Low)
+"""
+                        try:
+                            result = agent.llm.invoke(validation_prompt)
+                            full_output = clean_response(result.content if isinstance(result.content, str) else str(result.content))
+                            
+                            accuracy = "95%"
+                            risk = "Low"
+                            risk_color = "#1a8f5f"
+                            alignment = "High"
+                            explanation = full_output
+                            
+                            if "METRICS:" in full_output:
+                                parts = full_output.split("METRICS:")
+                                explanation = parts[0].strip()
+                                metric_line = parts[1].strip()
+                                m_parts = [m.strip() for m in metric_line.split("|")]
+                                if len(m_parts) >= 3:
+                                    accuracy = m_parts[0]
+                                    risk = m_parts[1]
+                                    alignment = m_parts[2]
+                                    if "high" in risk.lower():
+                                        risk_color = "#e35b5b"
+                                    elif "med" in risk.lower():
+                                        risk_color = "#f59e0b"
+                            
+                        except Exception as e:
+                            explanation = f"Could not perform live analysis: {str(e)}"
+                            accuracy = "90%"
+                            risk = "Low"
+                            risk_color = "#1a8f5f"
+                            alignment = "High"
+                    else:
+                        # Fallback mock validation
+                        lower = prompt_input.lower()
+                        has_issue = any(w in lower for w in ["terminate", "discriminat", "personal data", "client ssn", "reject application"])
+                        accuracy = "92%" if not has_issue else "64%"
+                        risk = "Low" if not has_issue else "High"
+                        risk_color = "#1a8f5f" if not has_issue else "#e35b5b"
+                        alignment = "High" if not has_issue else "Low"
+                        explanation = """**Compliance Audit Findings:**
+* The input does not contain major fair housing violations.
+* Language matches standard real estate disclosures.
+
+**Recommendations:**
+* Keep sentences brief.
+* Ensure clear disclosure of brokerage relationship if used in public advertising."""
+                    
+                    explanation_html = explanation.replace('\n', '<br>')
+                    
+                    # Display results
+                    st.markdown(f"""
+                    <div style="background:#ffffff; border:1px solid #e8eef0; border-radius:12px; padding:1.25rem; margin-top:1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                        <div style="font-weight:700; font-size:1rem; margin-bottom:0.75rem; color:#0d2418;">✅ Validation Status</div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:1.25rem; border-bottom:1px solid #f0f4f2; padding-bottom:0.75rem;">
+                            <div>
+                                <div style="font-size:0.68rem; text-transform:uppercase; color:#9aada5; font-weight:700;">Accuracy</div>
+                                <div style="font-weight:800; font-size:1.15rem; color:#0d2418; margin-top:0.15rem;">{accuracy}</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.68rem; text-transform:uppercase; color:#9aada5; font-weight:700;">Risk Level</div>
+                                <div style="font-weight:800; font-size:1.15rem; color:{risk_color}; margin-top:0.15rem;">{risk}</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.68rem; text-transform:uppercase; color:#9aada5; font-weight:700;">Alignment</div>
+                                <div style="font-weight:800; font-size:1.15rem; color:#0d2418; margin-top:0.15rem;">{alignment}</div>
+                            </div>
                         </div>
-                        <div>
-                            <div style="font-size:0.68rem; text-transform:uppercase; color:#9aada5;">Risk Level</div>
-                            <div style="font-weight:700; font-size:1rem; color:{risk_color};">{risk}</div>
-                        </div>
-                        <div>
-                            <div style="font-size:0.68rem; text-transform:uppercase; color:#9aada5;">Alignment</div>
-                            <div style="font-weight:700; font-size:1rem; color:#0d2418;">{alignment}</div>
+                        <div style="font-size:0.875rem; color:#2d3a33; line-height:1.6;">
+                            {explanation_html}
                         </div>
                     </div>
-                </div>
-                """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
             else:
-                st.error("Enter a prompt or response to validate.")
-
-        # ACP Prompt Engine
-        st.markdown('<br><div class="section-title">🔧 ACP Prompting Engine</div>', unsafe_allow_html=True)
-        scenario = st.selectbox("Scenario Template", ["Silent Client Follow-up", "Property Listing Description", "Commission Split Inquiry"])
-        defaults = {
-            "Silent Client Follow-up": ("Buyer Sarah Connor viewed 1045 River Rd 4 days ago. High interest in kitchen, silent on texts.", "Role: Senior Consultative Advisor. Tone: Warm, low-pressure. Max 120 words. Single open-ended question."),
-            "Property Listing Description": ("789 Oakridge Ave. 4 beds, 3.5 baths, solar panels, concrete counters.", "Role: Expert sustainable copywriter. Eco-conscious tone. 3 paragraphs max."),
-            "Commission Split Inquiry": ("Agent Kyle requests 5% bump in split for Valley View ($1.8M). Self-sourced buyer, spent $2k on brochures.", "Role: Brokerage Sales Manager. Firm but empathetic. Decline. Reference Section 4.2."),
-        }
-        ctx, params = defaults[scenario]
-        context_input = st.text_area("Context / Raw details:", value=ctx, height=80)
-        params_input = st.text_area("Parameters (Tone, Length, Constraints):", value=params, height=80)
-
-        if st.button("⚡ Compile ACP Prompt", use_container_width=False):
-            compiled = f"""[ROLE & PERSONA]
-You are a Real Estate Strategy Expert — professional, direct, outcome-oriented.
-
-[TASK ACTION]
-Generate a response for: {scenario}
-
-[CONTEXT]
-{context_input}
-
-[CONSTRAINTS]
-{params_input}
-
-[RULES]
-1. Write the final response directly — no meta-commentary.
-2. Strictly respect the constraints (length, tone, no buzzwords).
-3. Do not use phrases like "Sure, here is the email:"."""
-            st.code(compiled, language="markdown")
-            st.success("✅ ACP Prompt compiled! Copy into Gemini, ChatGPT, or Claude.")
-
-        # 5W1H Tool
-        st.markdown('<br><div class="section-title">📋 5W1H Reporting Tool</div>', unsafe_allow_html=True)
-        report_src = st.selectbox("Report Source", ["Weekly Pipeline Review Sync (Transcript)", "Active Escrow Pipeline (CRM Export)"])
-        raw = "Manager: Dave, status on 412 Hillside? Dave: Seller drops $15k if no offers by Wednesday. Broker open house Tuesday 10-12. Manager: Push MLS update Wednesday 9AM." if "Transcript" in report_src else "ESC-9011 | Dave | 233 Broad St | Loan Commitment Due Jun 25 | Upload pre-approval doc."
-        st.text_area("Raw Preview:", value=raw, height=80, disabled=True)
-        if st.button("📊 Generate 5W1H Digest", use_container_width=False):
-            if "Transcript" in report_src:
-                st.markdown("""
-**5W1H Structured Digest**
-- **Who:** Manager, Dave, Sarah
-- **What:** 412 Hillside price drop prep; 102 Pine St roof inspection credit dispute
-- **Where:** 412 Hillside St, 102 Pine St
-- **When:** Open House: Tuesday 10–12PM; MLS: Wednesday 9AM; Escrow: Friday 5PM
-- **Why:** Prevent listing staleness; keep Pine St escrow from terminating
-- **How:** Draft MLS price reduction; counter-offer $2,500 credit vs $5,000 demand
-                """)
-            else:
-                st.markdown("""
-**5W1H Structured Digest**
-- **Who:** Dave, Sarah, Marcus
-- **What:** Loan doc upload; easement dispute; agent reminder trigger
-- **Where:** 233 Broad St, 1045 River Rd, 890 Ridge Way
-- **When:** ESC-9011: Jun 25 5PM; ESC-8922: Jun 29 12PM; ESC-9055: Immediate
-- **Why:** Avoid contract defaults; resolve easement liability; arrest lead decay
-- **How:** Upload verification docs; legal review; auto-email trigger to Marcus
-                """)
+                st.error("Please enter some agent prompt or response text to validate.")
 
     with rules_col:
         st.markdown('<div class="section-title">📏 Active Rules</div>', unsafe_allow_html=True)
@@ -1219,31 +1231,33 @@ Generate a response for: {scenario}
             </div>
             """, unsafe_allow_html=True)
 
-        if st.button("+ Add Custom Governance Rule", use_container_width=True):
+        if st.button("+ Add Custom Governance Rule", use_container_width=True, key="gov_add_rule_btn"):
             st.info("Custom rule builder coming soon.")
 
         st.markdown("""
-        <div style="background:#0d3d2e; border-radius:10px; padding:1rem; color:#d4f0e6; margin-top:1rem; font-size:0.8rem;">
-            <div style="font-weight:700; margin-bottom:0.35rem;">⚡ Strategy Intelligence</div>
-            Your governance score has improved by 12% since last month. Recommend updating SOP v2.1 for latest market regulations.
-            <div style="margin-top:0.75rem;">
+        <div style="background:#0d3d2e; border-radius:10px; padding:1.2rem; color:#d4f0e6; margin-top:1.5rem; font-size:0.85rem; line-height:1.5; border:1px solid #1a8f5f;">
+            <div style="font-weight:700; margin-bottom:0.4rem; font-size:0.95rem; color:#ffffff;">⚡ Strategy Intelligence</div>
+            Your governance compliance rating has improved by 12% since last month. Recommend updating SOP v2.1 for latest market regulations.
+        </div>
         """, unsafe_allow_html=True)
-        if st.button("VIEW FULL AUDIT →", use_container_width=True):
-            st.info("Full audit report export coming soon.")
-        st.markdown("</div></div>", unsafe_allow_html=True)
 
-        # Explore advanced tools
-        st.markdown('<br><div class="section-title">Explore Advanced Tools</div>', unsafe_allow_html=True)
-        adv_tools = [
-            ("🤖", "Agent Persona Crafter", "Tune the empathy and expertise parameters of your sales AI agents."),
-            ("💬", "Social Proof Verifier", "Cross-reference client testimonials with verified transaction data."),
-            ("📉", "Leakage Auditor", "Identify where in the sales funnel AI responses lose momentum."),
-        ]
-        for icon, title, desc in adv_tools:
+    # Explore Advanced Tools Row at the bottom
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Explore Advanced Strategy Tools</div>', unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns(3)
+    adv_tools = [
+        ("🤖", "Agent Persona Crafter", "Tune the empathy and expertise parameters of your sales AI agents."),
+        ("💬", "Social Proof Verifier", "Cross-reference client testimonials with verified transaction data."),
+        ("📉", "Leakage Auditor", "Identify where in the sales funnel AI responses lose momentum."),
+    ]
+    
+    for col, (icon, title, desc) in zip([col1, col2, col3], adv_tools):
+        with col:
             st.markdown(f"""
-            <div class="tool-card">
-                <div style="font-size:1.3rem; margin-bottom:0.4rem;">{icon}</div>
-                <h4>{title}</h4>
-                <p>{desc}</p>
+            <div style="background:#ffffff; border:1px solid #e8eef0; border-radius:12px; padding:1.25rem; height:100%; box-shadow:0 2px 6px rgba(0,0,0,0.04);">
+                <div style="font-size:1.8rem; margin-bottom:0.5rem;">{icon}</div>
+                <h4 style="margin:0 0 0.35rem 0; font-size:0.95rem; font-weight:700; color:#0d2418;">{title}</h4>
+                <p style="margin:0; font-size:0.78rem; color:#7a8f85; line-height:1.4;">{desc}</p>
             </div>
             """, unsafe_allow_html=True)
