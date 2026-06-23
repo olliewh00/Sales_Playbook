@@ -320,6 +320,19 @@ def is_quota_error(e: Exception) -> bool:
     msg = str(e).lower()
     return "429" in msg or "quota" in msg or "resource_exhausted" in msg or "rate" in msg
 
+def clean_response(text: str) -> str:
+    """Strip Gemma 4 chain-of-thought <thought>...</thought> blocks.
+    The model outputs its reasoning inside these tags before the real answer."""
+    import re
+    # Remove anything inside <thought>...</thought> (including the tags)
+    text = re.sub(r"<thought>.*?</thought>", "", text, flags=re.DOTALL)
+    # Also handle unclosed <thought> blocks (model cuts off mid-think)
+    text = re.sub(r"<thought>.*", "", text, flags=re.DOTALL)
+    # Clean up any leftover think tags
+    text = re.sub(r"</?thought>", "", text)
+    return text.strip()
+
+
 
 # ============================================================
 # SESSION STATE
@@ -422,7 +435,7 @@ Question:
 """
         try:
             result = self.llm.invoke(prompt)
-            return result.content if isinstance(result.content, str) else str(result.content)
+            return clean_response(result.content if isinstance(result.content, str) else str(result.content))
         except Exception as e:
             if is_quota_error(e):
                 return "🚫 **API Quota Exceeded** — Your free tier daily limit is used up.\n\n**Fix options:**\n1. Wait ~24 hrs for quota to reset\n2. Enable billing at [aistudio.google.com](https://aistudio.google.com)"
@@ -438,7 +451,7 @@ Question:
             # No documents — use LLM directly without RAG
             try:
                 result = self.llm.invoke(prompt)
-                answer = result.content if isinstance(result.content, str) else str(result.content)
+                answer = clean_response(result.content if isinstance(result.content, str) else str(result.content))
                 return {"answer": answer, "source": "General AI (no docs indexed)"}
             except Exception as e:
                 if is_quota_error(e):
