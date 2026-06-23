@@ -93,7 +93,7 @@ st.markdown("""
         font-size: 0.72rem;
     }
 </style>
-""", unsafe_style_html=True)
+""", unsafe_allow_html=True)
 
 
 # --- SESSION STATE INITIALIZATION ---
@@ -359,8 +359,8 @@ def onboarding_modal():
 
 # --- SIDEBAR WIDGETS ---
 with st.sidebar:
-    st.markdown('<div style="display: flex; align-items: center; gap: 8px;"><div style="background:#3dd9b4; color:#0f1322; width:32px; height:32px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.1rem; box-shadow:0 0 10px rgba(61,217,180,0.4)">⚡</div><h2 style="margin:0; font-size:1.25rem;">RealtyAI</h2></div>', unsafe_style_html=True)
-    st.markdown('<span style="font-size:0.65rem; color:#3dd9b4; text-transform:uppercase; letter-spacing:1px;">Playbook Engine</span>', unsafe_style_html=True)
+    st.markdown('<div style="display: flex; align-items: center; gap: 8px;"><div style="background:#3dd9b4; color:#0f1322; width:32px; height:32px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.1rem; box-shadow:0 0 10px rgba(61,217,180,0.4)">⚡</div><h2 style="margin:0; font-size:1.25rem;">RealtyAI</h2></div>', unsafe_allow_html=True)
+    st.markdown('<span style="font-size:0.65rem; color:#3dd9b4; text-transform:uppercase; letter-spacing:1px;">Playbook Engine</span>', unsafe_allow_html=True)
     st.write("---")
 
     if not st.session_state.profile:
@@ -427,7 +427,7 @@ with tab1:
             <h3 style="font-size:1.6rem; color:#f87171; margin-top:0.25rem; font-weight:800;">{max(12.0 - reclaimed, 0.0):.1f}-{max(18.0 - reclaimed, 0.0):.1f} Hours</h3>
             <span style="font-size:0.72rem; color:#8e9bb4;">Leaking Current Week</span>
         </div>
-        """, unsafe_style_html=True)
+        """, unsafe_allow_html=True)
         
     with col2:
         focus_goal = "Maximize GCI"
@@ -446,7 +446,7 @@ with tab1:
             <h3 style="font-size:1.6rem; color:#ffffff; margin-top:0.25rem; font-weight:800;">{focus_goal}</h3>
             <span style="font-size:0.72rem; color:#8e9bb4;">{focus_sub}</span>
         </div>
-        """, unsafe_style_html=True)
+        """, unsafe_allow_html=True)
         
     with col3:
         st.markdown(f"""
@@ -455,7 +455,7 @@ with tab1:
             <h3 style="font-size:1.6rem; color:#3dd9b4; margin-top:0.25rem; font-weight:800;">Reclaim {int((reclaimed/target_hours)*100)}%</h3>
             <span style="font-size:0.72rem; color:#8e9bb4;">~{reclaimed:.1f}h of {target_hours:.0f}h Target</span>
         </div>
-        """, unsafe_style_html=True)
+        """, unsafe_allow_html=True)
 
     # Split: Time leak table & Guardrails
     dash_col1, dash_col2 = st.columns([1.2, 1])
@@ -471,7 +471,7 @@ with tab1:
         | **Repetitive Emails** | 3-5 Hours | ACP Prompt Engine | {'🟢 Deployed' if emails_tog else '🔴 Stalled'} |
         | **Manual Data Entry** | 3-4 Hours | Copilot in Excel | {'🟢 Deployed' if data_tog else '🔴 Stalled'} |
         | **Searching SOPs** | 2-3 Hours | NotebookLM SOP Chat | {'🟢 Deployed' if searching_tog else '🔴 Stalled'} |
-        """, unsafe_style_html=True)
+        """, unsafe_allow_html=True)
         
     with dash_col2:
         st.subheader("AI Governance & Usage Guardrails")
@@ -575,7 +575,7 @@ with tab2:
                             <span class="deal-act">{deal['nextStep']}</span>
                         </div>
                     </div>
-                    """, unsafe_style_html=True)
+                    """, unsafe_allow_html=True)
                     
                     # Selectbox to move stage (simulating drag-and-drop actions)
                     idx = ["Lead", "Discovery", "Proposal", "Closed Won"].index(stage_name)
