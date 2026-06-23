@@ -14,9 +14,15 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from langchain.tools.retriever import create_retriever_tool
+try:
+    from langchain_core.tools.retriever import create_retriever_tool
+except ImportError:
+    from langchain.tools.retriever import create_retriever_tool
 from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader, TextLoader
-from langchain_community.embeddings import FakeEmbeddings
+try:
+    from langchain_core.embeddings.fake import FakeEmbeddings
+except ImportError:
+    from langchain_community.embeddings import FakeEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter

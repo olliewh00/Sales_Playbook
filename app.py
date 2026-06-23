@@ -7,9 +7,15 @@ from typing import List
 
 # Import LangChain components
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain.tools.retriever import create_retriever_tool
+try:
+    from langchain_core.tools.retriever import create_retriever_tool
+except ImportError:
+    from langchain.tools.retriever import create_retriever_tool
 from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader, TextLoader
-from langchain_community.embeddings import FakeEmbeddings
+try:
+    from langchain_core.embeddings.fake import FakeEmbeddings
+except ImportError:
+    from langchain_community.embeddings import FakeEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_openai import ChatOpenAI
 
