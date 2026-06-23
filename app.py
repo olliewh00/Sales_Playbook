@@ -814,7 +814,7 @@ elif page == "Pipeline":
                 c_type = st.selectbox("Property Type", ["Residential", "Commercial", "Investment"])
                 c_stage = st.selectbox("Pipeline Stage", ["Lead", "Discovery", "Proposal", "Closed Won"])
                 c_agent = st.text_input("Assigned Agent", placeholder="Logan Roy")
-            c_tag = st.text_input("Action Tag", placeholder="Follow up")
+            c_tag = st.selectbox("Action Tag", ["Follow up", "Call Client", "Hot Lead", "Legal Review", "Negotiating", "Archive"])
             if st.form_submit_button("Create Deal Card", use_container_width=True):
                 if c_name.strip() and c_addr.strip():
                     new_id = max([d["id"] for d in st.session_state.deals], default=0) + 1
