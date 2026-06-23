@@ -312,9 +312,13 @@ def get_api_key():
 
 def get_model_name():
     try:
-        return st.secrets.get("GEMINI_MODEL", "gemini-2.0-flash")
+        return st.secrets.get("GEMINI_MODEL", "gemma-4-31b-it")
     except Exception:
-        return os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        return os.getenv("GEMINI_MODEL", "gemma-4-31b-it")
+
+def is_quota_error(e: Exception) -> bool:
+    msg = str(e).lower()
+    return "429" in msg or "quota" in msg or "resource_exhausted" in msg or "rate" in msg
 
 
 # ============================================================
@@ -427,11 +431,13 @@ Return strictly valid JSON:
                 return json.loads(content[start:end+1])
             return json.loads(content)
         except Exception as e:
-            return {"sufficient": True, "answer": f"Error: {e}", "confidence": "low"}
+            if is_quota_error(e):
+                return {"sufficient": False, "answer": "🚫 **API Quota Exceeded** — Your free tier daily limit is used up.\n\n**Fix options:**\n1. Wait ~24 hrs for quota to reset\n2. Enable billing at [aistudio.google.com](https://aistudio.google.com) (pay-as-you-go, ~$0.15/1M tokens)", "confidence": "low"}
+            return {"sufficient": False, "answer": f"⚠️ Model error: {str(e)[:200]}", "confidence": "low"}
 
     def ask(self, query: str, role: str, experience: str) -> dict:
         if not self.llm:
-            return {"answer": "⚠️ AI Coach is offline — no API key found. Add your GEMINI_API_KEY in Streamlit Cloud Secrets (Settings → Secrets).", "source": None}
+            return {"answer": "⚠️ AI Coach is offline — no API key found. Add your **GEMINI_API_KEY** in Streamlit Cloud **Settings → Secrets**.", "source": None}
         if not self.retriever:
             # No documents — use LLM directly without RAG
             try:
@@ -439,7 +445,9 @@ Return strictly valid JSON:
                 answer = result.content if isinstance(result.content, str) else str(result.content)
                 return {"answer": answer, "source": "General AI (no docs indexed)"}
             except Exception as e:
-                return {"answer": f"LLM error: {e}", "source": None}
+                if is_quota_error(e):
+                    return {"answer": "🚫 **API Quota Exceeded** — Your free tier daily limit is used up.\n\n**Fix:** Enable billing at [aistudio.google.com](https://aistudio.google.com) or wait ~24 hrs for quota reset.", "source": None}
+                return {"answer": f"⚠️ Error: {str(e)[:200]}", "source": None}
         documents = self.retriever.invoke(query)
         sources = sorted({Path(doc.metadata.get("source", "Unknown")).name for doc in documents})
         context = "\n\n".join(doc.page_content for doc in documents)

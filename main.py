@@ -99,7 +99,7 @@ class DecisionAgent:
     gemini_api_key = os.getenv("GEMINI_API_KEY")
     if gemini_api_key:
       self.llm = ChatOpenAI(
-        model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+        model=os.getenv("GEMINI_MODEL", "gemma-4-31b-it"),
         api_key=gemini_api_key,
         base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
         temperature=0.2
