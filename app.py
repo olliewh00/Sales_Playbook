@@ -408,53 +408,51 @@ class StreamlitDecisionAgent:
             "Search the sales strategy knowledge base for tactical guidance.",
         )
 
-    def _llm_decision(self, query: str, context: str, role: str, experience: str) -> dict:
+    def _llm_decision(self, query: str, context: str, role: str, experience: str) -> str:
         prompt = f"""You are a senior real estate sales enablement coach.
 The user is a {role} with {experience} experience.
-Use only the context below to answer. Be concise, actionable, and tailor your tone to their experience level.
+Use only the context below to give a concise, actionable answer. Tailor your tone to their experience level.
+Do NOT wrap your answer in JSON or any code block — just reply directly in plain text.
 
 Context:
 {context}
 
 Question:
 {query}
-
-Return strictly valid JSON:
-{{"sufficient": true, "answer": "...", "confidence": "high|medium|low"}}
 """
         try:
             result = self.llm.invoke(prompt)
-            content = result.content if isinstance(result.content, str) else str(result.content)
-            start = content.find("{")
-            end = content.rfind("}")
-            if start != -1 and end != -1:
-                return json.loads(content[start:end+1])
-            return json.loads(content)
+            return result.content if isinstance(result.content, str) else str(result.content)
         except Exception as e:
             if is_quota_error(e):
-                return {"sufficient": False, "answer": "🚫 **API Quota Exceeded** — Your free tier daily limit is used up.\n\n**Fix options:**\n1. Wait ~24 hrs for quota to reset\n2. Enable billing at [aistudio.google.com](https://aistudio.google.com) (pay-as-you-go, ~$0.15/1M tokens)", "confidence": "low"}
-            return {"sufficient": False, "answer": f"⚠️ Model error: {str(e)[:200]}", "confidence": "low"}
+                return "🚫 **API Quota Exceeded** — Your free tier daily limit is used up.\n\n**Fix options:**\n1. Wait ~24 hrs for quota to reset\n2. Enable billing at [aistudio.google.com](https://aistudio.google.com)"
+            return f"⚠️ Model error: {str(e)[:200]}"
 
     def ask(self, query: str, role: str, experience: str) -> dict:
         if not self.llm:
             return {"answer": "⚠️ AI Coach is offline — no API key found. Add your **GEMINI_API_KEY** in Streamlit Cloud **Settings → Secrets**.", "source": None}
+
+        prompt = f"You are a real estate sales coach. Answer this question for a {role} ({experience}). Reply in plain text only — no JSON, no code blocks.\n\nQuestion: {query}"
+
         if not self.retriever:
             # No documents — use LLM directly without RAG
             try:
-                result = self.llm.invoke(f"You are a real estate sales coach. Answer this question for a {role} ({experience}): {query}")
+                result = self.llm.invoke(prompt)
                 answer = result.content if isinstance(result.content, str) else str(result.content)
                 return {"answer": answer, "source": "General AI (no docs indexed)"}
             except Exception as e:
                 if is_quota_error(e):
                     return {"answer": "🚫 **API Quota Exceeded** — Your free tier daily limit is used up.\n\n**Fix:** Enable billing at [aistudio.google.com](https://aistudio.google.com) or wait ~24 hrs for quota reset.", "source": None}
                 return {"answer": f"⚠️ Error: {str(e)[:200]}", "source": None}
+
         documents = self.retriever.invoke(query)
         sources = sorted({Path(doc.metadata.get("source", "Unknown")).name for doc in documents})
         context = "\n\n".join(doc.page_content for doc in documents)
         if context.strip():
-            decision = self._llm_decision(query, context, role, experience)
-            return {"answer": decision.get("answer", "No answer found."), "source": ", ".join(sources)}
-        return {"answer": "Could not find relevant info. Try uploading more documents.", "source": None}
+            answer = self._llm_decision(query, context, role, experience)
+            return {"answer": answer, "source": ", ".join(sources)}
+        return {"answer": "Could not find relevant info in the knowledge base. Try uploading more documents.", "source": None}
+
 
 
 # ============================================================
