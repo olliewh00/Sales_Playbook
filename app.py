@@ -338,7 +338,16 @@ def clean_response(text: str) -> str:
 # SESSION STATE
 # ============================================================
 if "profile" not in st.session_state:
-    st.session_state.profile = None
+    qp = st.query_params
+    if "name" in qp and "focus" in qp:
+        st.session_state.profile = {
+            "name": qp["name"],
+            "focus": qp["focus"],
+            "experience": qp.get("experience", "Senior (8+ years)"),
+            "targetSavings": int(qp["targetSavings"]) if "targetSavings" in qp and qp["targetSavings"].isdigit() else 16
+        }
+    else:
+        st.session_state.profile = None
 
 if "deals" not in st.session_state:
     st.session_state.deals = [
@@ -360,7 +369,18 @@ if "nb_chat_history" not in st.session_state:
     ]
 
 if "active_page" not in st.session_state:
-    st.session_state.active_page = "Dashboard"
+    st.session_state.active_page = st.query_params.get("page", "Dashboard")
+
+def switch_page(page_name):
+    st.session_state.active_page = page_name
+    st.query_params["page"] = page_name
+    if st.session_state.profile:
+        p = st.session_state.profile
+        st.query_params["name"] = p["name"]
+        st.query_params["focus"] = p["focus"]
+        st.query_params["experience"] = p["experience"]
+        st.query_params["targetSavings"] = str(p["targetSavings"])
+    st.rerun()
 
 
 # ============================================================
@@ -497,8 +517,7 @@ with st.sidebar:
         is_active = st.session_state.active_page == page
         btn_style = "background:#1a8f5f !important;" if is_active else ""
         if st.button(f"{icon}  {page}", key=f"nav_{page}", use_container_width=True):
-            st.session_state.active_page = page
-            st.rerun()
+            switch_page(page)
 
     st.markdown("---")
 
@@ -514,6 +533,7 @@ with st.sidebar:
         """, unsafe_allow_html=True)
         if st.button("Edit Profile", use_container_width=True):
             st.session_state.profile = None
+            st.query_params.clear()
             st.rerun()
     else:
         st.info("Set up your profile to personalise the AI coach.")
@@ -570,6 +590,10 @@ if not st.session_state.profile:
                 st.error("Please enter your name.")
             else:
                 st.session_state.profile = {"name": name.strip(), "focus": focus, "experience": exp, "targetSavings": savings}
+                st.query_params["name"] = name.strip()
+                st.query_params["focus"] = focus
+                st.query_params["experience"] = exp
+                st.query_params["targetSavings"] = str(savings)
                 st.rerun()
     st.stop()
 
@@ -756,18 +780,14 @@ if page == "Dashboard":
         qa1, qa2 = st.columns(2)
         with qa1:
             if st.button("💬 Ask AI Coach", use_container_width=True, key="dash_coach"):
-                st.session_state.active_page = "AI Coach"
-                st.rerun()
+                switch_page("AI Coach")
             if st.button("📚 Browse SOPs", use_container_width=True, key="dash_sops"):
-                st.session_state.active_page = "SOPs"
-                st.rerun()
+                switch_page("SOPs")
         with qa2:
             if st.button("📋 View Pipeline", use_container_width=True, key="dash_pipe"):
-                st.session_state.active_page = "Pipeline"
-                st.rerun()
+                switch_page("Pipeline")
             if st.button("🛠 Strategy Tools", use_container_width=True, key="dash_tools"):
-                st.session_state.active_page = "Strategy Tools"
-                st.rerun()
+                switch_page("Strategy Tools")
 
 
 
